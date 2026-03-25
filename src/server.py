@@ -43,6 +43,7 @@ from .mcp_storage_extended import StorageExtendedMCP, MCP_TOOLS as STORAGE_EXTEN
 from .mcp_disk_extended import DiskExtendedMCP, MCP_TOOLS as DISK_EXTENDED_MCP_TOOLS
 from .mcp_events import EventsMCP, MCP_TOOLS as EVENTS_MCP_TOOLS
 from .mcp_affinity import AffinityMCP, MCP_TOOLS as AFFINITY_MCP_TOOLS
+from .mcp_rbac import RbacMCP, MCP_TOOLS as RBAC_MCP_TOOLS
 
 # 合并所有 MCP_TOOLS
 MCP_TOOLS = {
@@ -53,6 +54,7 @@ MCP_TOOLS = {
     **DISK_EXTENDED_MCP_TOOLS,
     **EVENTS_MCP_TOOLS,
     **AFFINITY_MCP_TOOLS,
+    **RBAC_MCP_TOOLS,
 }
 
 logger = logging.getLogger(__name__)
@@ -556,6 +558,127 @@ TOOL_SCHEMAS: Dict[str, dict] = {
         },
         "required": ["cluster", "affinity_group", "vm"],
     },
+
+    # RBAC - User tools
+    "user_list": {
+        "type": "object",
+        "properties": {"search": {"type": "string", "description": "搜索条件（可选）"}},
+    },
+    "user_get": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "用户名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+
+    # RBAC - Group tools
+    "group_list": {
+        "type": "object",
+        "properties": {"search": {"type": "string", "description": "搜索条件（可选）"}},
+    },
+    "group_get": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "组名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+
+    # RBAC - Role tools
+    "role_list": {"type": "object", "properties": {}},
+    "role_get": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "角色名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "role_create": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "角色名称"},
+            "description": {"type": "string", "description": "描述（可选）"},
+            "administrative": {"type": "boolean", "description": "是否为管理员角色，默认 false"},
+            "permit_ids": {"type": "array", "items": {"type": "string"}, "description": "权限 ID 列表"},
+        },
+        "required": ["name"],
+    },
+    "role_delete": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "角色名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+
+    # RBAC - Permit tools
+    "permit_list": {"type": "object", "properties": {}},
+
+    # RBAC - Permission tools
+    "permission_list": {
+        "type": "object",
+        "properties": {
+            "resource_type": {"type": "string", "description": "资源类型（vm/host/cluster/datacenter/network/storagedomain/template）"},
+            "resource_id": {"type": "string", "description": "资源 ID 或名称"},
+        },
+        "required": ["resource_type", "resource_id"],
+    },
+    "permission_assign": {
+        "type": "object",
+        "properties": {
+            "resource_type": {"type": "string", "description": "资源类型（vm/host/cluster/datacenter/network/storagedomain/template）"},
+            "resource_id": {"type": "string", "description": "资源 ID 或名称"},
+            "user_or_group": {"type": "string", "description": "主体类型（user 或 group）"},
+            "role_name": {"type": "string", "description": "角色名称或 ID"},
+            "principal_name": {"type": "string", "description": "用户名或组名"},
+        },
+        "required": ["resource_type", "resource_id", "user_or_group", "role_name", "principal_name"],
+    },
+    "permission_revoke": {
+        "type": "object",
+        "properties": {
+            "resource_type": {"type": "string", "description": "资源类型"},
+            "resource_id": {"type": "string", "description": "资源 ID 或名称"},
+            "permission_id": {"type": "string", "description": "权限 ID"},
+        },
+        "required": ["resource_type", "resource_id", "permission_id"],
+    },
+
+    # RBAC - Tag tools
+    "tag_list": {"type": "object", "properties": {}},
+    "tag_create": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "标签名称"},
+            "description": {"type": "string", "description": "描述（可选）"},
+            "parent_name": {"type": "string", "description": "父标签名称（可选）"},
+        },
+        "required": ["name"],
+    },
+    "tag_delete": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "标签名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "tag_assign": {
+        "type": "object",
+        "properties": {
+            "resource_type": {"type": "string", "description": "资源类型（vm/host/cluster/datacenter/network/storagedomain/template）"},
+            "resource_id": {"type": "string", "description": "资源 ID 或名称"},
+            "tag_name": {"type": "string", "description": "标签名称或 ID"},
+        },
+        "required": ["resource_type", "resource_id", "tag_name"],
+    },
+    "tag_unassign": {
+        "type": "object",
+        "properties": {
+            "resource_type": {"type": "string", "description": "资源类型"},
+            "resource_id": {"type": "string", "description": "资源 ID 或名称"},
+            "tag_name": {"type": "string", "description": "标签名称或 ID"},
+        },
+        "required": ["resource_type", "resource_id", "tag_name"],
+    },
+    "tag_list_resources": {
+        "type": "object",
+        "properties": {
+            "resource_type": {"type": "string", "description": "资源类型"},
+            "resource_id": {"type": "string", "description": "资源 ID 或名称"},
+        },
+        "required": ["resource_type", "resource_id"],
+    },
 }
 
 DEFAULT_SCHEMA = {"type": "object", "properties": {}}
@@ -618,6 +741,25 @@ EXTENSION_METHODS = {
     "delete_affinity_group": "affinity_mcp",
     "add_vm_to_affinity_group": "affinity_mcp",
     "remove_vm_from_affinity_group": "affinity_mcp",
+    # RbacMCP
+    "list_users": "rbac_mcp",
+    "get_user": "rbac_mcp",
+    "list_groups": "rbac_mcp",
+    "get_group": "rbac_mcp",
+    "list_roles": "rbac_mcp",
+    "get_role": "rbac_mcp",
+    "create_role": "rbac_mcp",
+    "delete_role": "rbac_mcp",
+    "list_permits": "rbac_mcp",
+    "list_permissions": "rbac_mcp",
+    "assign_permission": "rbac_mcp",
+    "revoke_permission": "rbac_mcp",
+    "list_tags": "rbac_mcp",
+    "create_tag": "rbac_mcp",
+    "delete_tag": "rbac_mcp",
+    "assign_tag": "rbac_mcp",
+    "unassign_tag": "rbac_mcp",
+    "list_resource_tags": "rbac_mcp",
 }
 
 
@@ -633,6 +775,7 @@ class OvirtMCPServer:
         self.network_mcp = NetworkMCP(self.connection)
         self.cluster_mcp = ClusterMCP(self.connection)
         self.template_mcp = TemplateMCP(self.connection)
+        self.rbac_mcp = RbacMCP(self.connection)
 
         # Build tool registry
         self.tool_handlers: Dict[str, Callable[..., Any]] = {}
