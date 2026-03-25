@@ -1,6 +1,6 @@
 """Tests for MCP server tool registration."""
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 
 from src.config import Config
 
@@ -14,6 +14,15 @@ def mock_config():
     )
 
 
+# 检查 mcp 模块是否可用
+try:
+    import mcp
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+
+
+@pytest.mark.skipif(not MCP_AVAILABLE, reason="mcp module not installed")
 @patch("src.ovirt_mcp.Connection")
 class TestOvirtMCPServer:
     """Tests for the MCP server."""
