@@ -251,6 +251,71 @@ class EventsMCP:
         except Exception as e:
             raise RuntimeError(f"清除告警失败: {e}")
 
+    # ── 事件订阅管理 ────────────────────────────────────────────────────────
+
+    def list_event_subscriptions(self, user: str = None) -> List[Dict]:
+        """列出事件订阅
+
+        Args:
+            user: 用户名称（可选）
+
+        Returns:
+            事件订阅列表
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        try:
+            subscriptions_service = self.ovirt.connection.system_service().event_subscriptions_service()
+
+            search = None
+            if user:
+                search = f"user={_sanitize_search_value(user)}"
+
+            subscriptions = subscriptions_service.list(search=search)
+        except Exception as e:
+            logger.error(f"获取事件订阅失败: {e}")
+            return []
+
+        return [
+            {
+                "id": s.id,
+                "user": s.user.name if hasattr(s, 'user') and s.user else "",
+                "user_id": s.user.id if hasattr(s, 'user') and s.user else "",
+                "event_type": str(s.event.type.value) if hasattr(s, 'event') and s.event else "",
+                "method": str(s.method.value) if hasattr(s, 'method') and s.method else "",
+                "enabled": s.enabled if hasattr(s, 'enabled') else True,
+            }
+            for s in subscriptions
+        ]
+
+    # ── 书签管理 ────────────────────────────────────────────────────────────
+
+    def list_bookmarks(self) -> List[Dict]:
+        """列出书签
+
+        Returns:
+            书签列表
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        try:
+            bookmarks_service = self.ovirt.connection.system_service().bookmarks_service()
+            bookmarks = bookmarks_service.list()
+        except Exception as e:
+            logger.error(f"获取书签列表失败: {e}")
+            return []
+
+        return [
+            {
+                "id": b.id,
+                "name": b.name,
+                "value": b.value if hasattr(b, 'value') else "",
+            }
+            for b in bookmarks
+        ]
+
 
 # MCP 工具注册表
 MCP_TOOLS = {
@@ -263,4 +328,8 @@ MCP_TOOLS = {
     "event_summary": {"method": "get_events_summary", "description": "获取事件统计摘要"},
     "event_acknowledge": {"method": "acknowledge_event", "description": "确认事件"},
     "event_clear_alerts": {"method": "clear_alerts", "description": "清除告警事件"},
+
+    # 新增工具
+    "event_subscription_list": {"method": "list_event_subscriptions", "description": "列出事件订阅"},
+    "bookmark_list": {"method": "list_bookmarks", "description": "列出书签"},
 }

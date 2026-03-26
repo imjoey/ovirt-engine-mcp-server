@@ -974,12 +974,220 @@ class RbacMCP:
 
         return result
 
+    # ── User 扩展管理 ────────────────────────────────────────────────────────
+
+    def create_user(self, user_name: str, domain: str,
+                   email: str = None, department: str = None) -> Dict[str, Any]:
+        """创建用户
+
+        Args:
+            user_name: 用户名（格式：user@domain）
+            domain: 域名称
+            email: 邮箱地址
+            department: 部门
+
+        Returns:
+            创建结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        users_service = self.ovirt.connection.system_service().users_service()
+
+        # 查找域
+        domains_service = self.ovirt.connection.system_service().domains_service()
+        domains = domains_service.list(search=f"name={_sanitize_search_value(domain)}")
+        if not domains:
+            raise ValueError(f"域不存在: {domain}")
+
+        try:
+            user = users_service.add(
+                sdk.types.User(
+                    user_name=user_name,
+                    domain=sdk.types.Domain(id=domains[0].id),
+                    email=email,
+                    department=department,
+                )
+            )
+
+            return {
+                "success": True,
+                "message": f"用户 {user_name} 已创建",
+                "user_id": user.id,
+            }
+        except Exception as e:
+            raise RuntimeError(f"创建用户失败: {e}")
+
+    def update_user(self, name_or_id: str, email: str = None,
+                   department: str = None) -> Dict[str, Any]:
+        """更新用户
+
+        Args:
+            name_or_id: 用户名称或 ID
+            email: 新邮箱
+            department: 新部门
+
+        Returns:
+            更新结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        user = self._find_user(name_or_id)
+        if not user:
+            raise ValueError(f"用户不存在: {name_or_id}")
+
+        users_service = self.ovirt.connection.system_service().users_service()
+        user_service = users_service.user_service(user.id)
+
+        if email is not None:
+            user.email = email
+        if department is not None:
+            user.department = department
+
+        try:
+            user_service.update(user)
+            return {"success": True, "message": f"用户已更新"}
+        except Exception as e:
+            raise RuntimeError(f"更新用户失败: {e}")
+
+    def delete_user(self, name_or_id: str) -> Dict[str, Any]:
+        """删除用户
+
+        Args:
+            name_or_id: 用户名称或 ID
+
+        Returns:
+            删除结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        user = self._find_user(name_or_id)
+        if not user:
+            raise ValueError(f"用户不存在: {name_or_id}")
+
+        users_service = self.ovirt.connection.system_service().users_service()
+        user_service = users_service.user_service(user.id)
+
+        try:
+            user_service.remove()
+            return {"success": True, "message": f"用户 {user.name} 已删除"}
+        except Exception as e:
+            raise RuntimeError(f"删除用户失败: {e}")
+
+    def list_user_groups(self, name_or_id: str) -> List[Dict]:
+        """列出用户所属的组
+
+        Args:
+            name_or_id: 用户名称或 ID
+
+        Returns:
+            组列表
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        user = self._find_user(name_or_id)
+        if not user:
+            raise ValueError(f"用户不存在: {name_or_id}")
+
+        users_service = self.ovirt.connection.system_service().users_service()
+        user_service = users_service.user_service(user.id)
+        groups_service = user_service.groups_service()
+
+        try:
+            groups = groups_service.list()
+        except Exception as e:
+            logger.error(f"获取用户组失败: {e}")
+            return []
+
+        return [
+            {
+                "id": g.id,
+                "name": g.name,
+                "domain": g.domain.name if g.domain else "",
+            }
+            for g in groups
+        ]
+
+    # ── Role 扩展管理 ────────────────────────────────────────────────────────
+
+    def update_role(self, name_or_id: str, new_name: str = None,
+                   description: str = None,
+                   administrative: bool = None) -> Dict[str, Any]:
+        """更新角色
+
+        Args:
+            name_or_id: 角色名称或 ID
+            new_name: 新名称
+            description: 新描述
+            administrative: 是否为管理员角色
+
+        Returns:
+            更新结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        role = self._find_role(name_or_id)
+        if not role:
+            raise ValueError(f"角色不存在: {name_or_id}")
+
+        roles_service = self.ovirt.connection.system_service().roles_service()
+        role_service = roles_service.role_service(role.id)
+
+        if new_name:
+            role.name = new_name
+        if description is not None:
+            role.description = description
+        if administrative is not None:
+            role.administrative = administrative
+
+        try:
+            role_service.update(role)
+            return {"success": True, "message": f"角色已更新"}
+        except Exception as e:
+            raise RuntimeError(f"更新角色失败: {e}")
+
+    # ── Filter 管理 ──────────────────────────────────────────────────────────
+
+    def list_filters(self) -> List[Dict]:
+        """列出权限过滤器
+
+        Returns:
+            过滤器列表
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        filters_service = self.ovirt.connection.system_service().filters_service()
+
+        try:
+            filters = filters_service.list()
+        except Exception as e:
+            logger.error(f"获取过滤器列表失败: {e}")
+            return []
+
+        return [
+            {
+                "id": f.id,
+                "name": f.name if hasattr(f, 'name') else "",
+                "permission": f.permission.name if hasattr(f, 'permission') and f.permission else "",
+            }
+            for f in filters
+        ]
+
 
 # MCP 工具注册表
 MCP_TOOLS = {
     # User 管理
     "user_list": {"method": "list_users", "description": "列出用户"},
     "user_get": {"method": "get_user", "description": "获取用户详情"},
+    "user_create": {"method": "create_user", "description": "创建用户"},
+    "user_update": {"method": "update_user", "description": "更新用户"},
+    "user_delete": {"method": "delete_user", "description": "删除用户"},
+    "user_groups": {"method": "list_user_groups", "description": "列出用户所属的组"},
 
     # Group 管理
     "group_list": {"method": "list_groups", "description": "列出用户组"},
@@ -989,6 +1197,7 @@ MCP_TOOLS = {
     "role_list": {"method": "list_roles", "description": "列出角色"},
     "role_get": {"method": "get_role", "description": "获取角色详情"},
     "role_create": {"method": "create_role", "description": "创建角色"},
+    "role_update": {"method": "update_role", "description": "更新角色"},
     "role_delete": {"method": "delete_role", "description": "删除角色"},
 
     # Permit 管理
@@ -1006,4 +1215,7 @@ MCP_TOOLS = {
     "tag_assign": {"method": "assign_tag", "description": "为资源分配标签"},
     "tag_unassign": {"method": "unassign_tag", "description": "移除资源的标签"},
     "tag_list_resources": {"method": "list_resource_tags", "description": "列出资源的标签"},
+
+    # Filter 管理
+    "filter_list": {"method": "list_filters", "description": "列出权限过滤器"},
 }

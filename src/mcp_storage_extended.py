@@ -272,6 +272,355 @@ class StorageExtendedMCP:
             "master": sd.master if hasattr(sd, 'master') else False,
         }
 
+    def refresh_storage_domain(self, name_or_id: str) -> Dict[str, Any]:
+        """刷新存储域
+
+        Args:
+            name_or_id: 存储域名称或 ID
+
+        Returns:
+            刷新结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        sd = self._find_storage_domain(name_or_id)
+        if not sd:
+            raise ValueError(f"存储域不存在: {name_or_id}")
+
+        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+
+        try:
+            sd_service.refresh()
+            return {"success": True, "message": f"存储域 {sd.name} 刷新任务已启动"}
+        except Exception as e:
+            raise RuntimeError(f"刷新存储域失败: {e}")
+
+    def update_storage_domain(self, name_or_id: str, new_name: str = None,
+                             description: str = None,
+                             warning_low_space: int = None,
+                             critical_low_space: int = None) -> Dict[str, Any]:
+        """更新存储域
+
+        Args:
+            name_or_id: 存储域名称或 ID
+            new_name: 新名称
+            description: 新描述
+            warning_low_space: 低空间警告阈值（GB）
+            critical_low_space: 临界空间阈值（GB）
+
+        Returns:
+            更新结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        sd = self._find_storage_domain(name_or_id)
+        if not sd:
+            raise ValueError(f"存储域不存在: {name_or_id}")
+
+        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+
+        if new_name:
+            sd.name = new_name
+        if description is not None:
+            sd.description = description
+        if warning_low_space is not None:
+            sd.warning_low_space_indicator = warning_low_space * 1024**3
+        if critical_low_space is not None:
+            sd.critical_space_action_blocker = critical_low_space * 1024**3
+
+        try:
+            sd_service.update(sd)
+            return {"success": True, "message": f"存储域已更新"}
+        except Exception as e:
+            raise RuntimeError(f"更新存储域失败: {e}")
+
+    def list_storage_files(self, name_or_id: str) -> List[Dict]:
+        """列出存储域的文件
+
+        Args:
+            name_or_id: 存储域名称或 ID
+
+        Returns:
+            文件列表
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        sd = self._find_storage_domain(name_or_id)
+        if not sd:
+            raise ValueError(f"存储域不存在: {name_or_id}")
+
+        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+        files_service = sd_service.files_service()
+
+        try:
+            files = files_service.list()
+        except Exception as e:
+            logger.error(f"获取存储域文件失败: {e}")
+            return []
+
+        return [
+            {
+                "id": f.id,
+                "name": f.name,
+                "size": f.size if hasattr(f, 'size') else 0,
+            }
+            for f in files
+        ]
+
+    def list_storage_connections(self, name_or_id: str = None) -> List[Dict]:
+        """列出存储连接
+
+        Args:
+            name_or_id: 存储域名称或 ID（可选，不指定则列出所有）
+
+        Returns:
+            存储连接列表
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        connections_service = self.ovirt.connection.system_service().storage_connections_service()
+
+        try:
+            connections = connections_service.list()
+        except Exception as e:
+            logger.error(f"获取存储连接失败: {e}")
+            return []
+
+        return [
+            {
+                "id": c.id,
+                "address": c.address if hasattr(c, 'address') else "",
+                "type": str(c.type.value) if hasattr(c, 'type') and c.type else "",
+                "path": c.path if hasattr(c, 'path') else "",
+                "port": c.port if hasattr(c, 'port') else 0,
+                "mount_options": c.mount_options if hasattr(c, 'mount_options') else "",
+                "nfs_version": str(c.nfs_version.value) if hasattr(c, 'nfs_version') and c.nfs_version else "",
+            }
+            for c in connections
+        ]
+
+    def list_available_disks(self, name_or_id: str) -> List[Dict]:
+        """列出存储域上的可用磁盘
+
+        Args:
+            name_or_id: 存储域名称或 ID
+
+        Returns:
+            可用磁盘列表
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        sd = self._find_storage_domain(name_or_id)
+        if not sd:
+            raise ValueError(f"存储域不存在: {name_or_id}")
+
+        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+        disks_service = sd_service.disk_service()
+
+        try:
+            disks = disks_service.list()
+        except Exception as e:
+            logger.error(f"获取可用磁盘失败: {e}")
+            return []
+
+        return [
+            {
+                "id": d.id,
+                "name": d.name,
+                "size_gb": int((d.provisioned_size or 0) / (1024**3)),
+                "actual_size_gb": int((d.actual_size or 0) / (1024**3)),
+                "format": str(d.format.value) if d.format else "cow",
+                "status": str(d.status.value) if d.status else "ok",
+                "sparse": d.sparse if hasattr(d, 'sparse') else True,
+            }
+            for d in disks
+        ]
+
+    def list_export_vms(self, name_or_id: str) -> List[Dict]:
+        """列出导出域上的 VM
+
+        Args:
+            name_or_id: 导出域名称或 ID
+
+        Returns:
+            VM 列表
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        sd = self._find_storage_domain(name_or_id)
+        if not sd:
+            raise ValueError(f"存储域不存在: {name_or_id}")
+
+        # 检查是否为导出域
+        if sd.type and sd.type.value != "export":
+            raise ValueError("此存储域不是导出域")
+
+        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+        vms_service = sd_service.vms_service()
+
+        try:
+            vms = vms_service.list()
+        except Exception as e:
+            logger.error(f"获取导出 VM 列表失败: {e}")
+            return []
+
+        return [
+            {
+                "id": vm.id,
+                "name": vm.name,
+                "description": vm.description or "",
+                "memory_mb": int(vm.memory / (1024**2)) if vm.memory else 0,
+                "cpu_cores": vm.cpu.topology.cores if vm.cpu and vm.cpu.topology else 0,
+                "os_type": vm.os.type if vm.os else "",
+            }
+            for vm in vms
+        ]
+
+    def import_vm_from_export(self, name_or_id: str, vm_name: str,
+                             cluster: str, storage_domain: str = None,
+                             clone: bool = False) -> Dict[str, Any]:
+        """从导出域导入 VM
+
+        Args:
+            name_or_id: 导出域名称或 ID
+            vm_name: 要导入的 VM 名称
+            cluster: 目标集群
+            storage_domain: 目标存储域（可选）
+            clone: 是否克隆
+
+        Returns:
+            导入结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        sd = self._find_storage_domain(name_or_id)
+        if not sd:
+            raise ValueError(f"存储域不存在: {name_or_id}")
+
+        # 查找集群
+        clusters = self.ovirt.connection.system_service().clusters_service().list(
+            search=f"name={_sanitize_search_value(cluster)}"
+        )
+        if not clusters:
+            raise ValueError(f"集群不存在: {cluster}")
+
+        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+        vms_service = sd_service.vms_service()
+
+        # 查找要导入的 VM
+        vms = vms_service.list(search=f"name={_sanitize_search_value(vm_name)}")
+        if not vms:
+            raise ValueError(f"导出域中不存在 VM: {vm_name}")
+
+        vm = vms[0]
+        vm_service = vms_service.vm_service(vm.id)
+
+        try:
+            # 导入 VM
+            import_params = sdk.types.Vm(
+                cluster=sdk.types.Cluster(id=clusters[0].id),
+            )
+            if storage_domain:
+                sd_target = self._find_storage_domain(storage_domain)
+                if sd_target:
+                    import_params.placement_policy = sdk.types.VmPlacementPolicy(
+                        host=sdk.types.Host(id=sd_target.id)
+                    )
+
+            result = vm_service.import_(
+                storage_domain=sdk.types.StorageDomain(id=sd.id) if storage_domain else None,
+                cluster=sdk.types.Cluster(id=clusters[0].id),
+                clone=clone,
+            )
+
+            return {
+                "success": True,
+                "message": f"VM {vm_name} 导入任务已启动",
+                "vm_id": vm.id,
+                "cluster": cluster,
+            }
+        except Exception as e:
+            raise RuntimeError(f"导入 VM 失败: {e}")
+
+    def list_disk_snapshots(self, disk_name_or_id: str) -> List[Dict]:
+        """列出磁盘快照
+
+        Args:
+            disk_name_or_id: 磁盘名称或 ID
+
+        Returns:
+            磁盘快照列表
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        # 查找磁盘
+        disks_service = self.ovirt.connection.system_service().disks_service()
+
+        disk_id = None
+        try:
+            disk = disks_service.disk_service(disk_name_or_id).get()
+            disk_id = disk_name_or_id
+        except Exception:
+            disks = disks_service.list(search=f"name={_sanitize_search_value(disk_name_or_id)}")
+            if not disks:
+                raise ValueError(f"磁盘不存在: {disk_name_or_id}")
+            disk_id = disks[0].id
+
+        disk_service = disks_service.disk_service(disk_id)
+        snapshots_service = disk_service.disk_snapshots_service()
+
+        try:
+            snapshots = snapshots_service.list()
+        except Exception as e:
+            logger.error(f"获取磁盘快照失败: {e}")
+            return []
+
+        return [
+            {
+                "id": s.id,
+                "description": s.description if hasattr(s, 'description') else "",
+                "size_gb": int((s.provisioned_size or 0) / (1024**3)),
+                "creation_time": str(s.creation_time) if hasattr(s, 'creation_time') else "",
+                "status": str(s.status.value) if s.status else "ok",
+            }
+            for s in snapshots
+        ]
+
+    def list_iscsi_bonds(self) -> List[Dict]:
+        """列出 iSCSI Bond
+
+        Returns:
+            iSCSI Bond 列表
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        bonds_service = self.ovirt.connection.system_service().iscsi_bonds_service()
+
+        try:
+            bonds = bonds_service.list()
+        except Exception as e:
+            logger.error(f"获取 iSCSI Bond 列表失败: {e}")
+            return []
+
+        return [
+            {
+                "id": b.id,
+                "name": b.name,
+                "description": b.description if hasattr(b, 'description') else "",
+                "data_center": b.data_center.name if hasattr(b, 'data_center') and b.data_center else "",
+            }
+            for b in bonds
+        ]
+
 
 # MCP 工具注册表
 MCP_TOOLS = {
@@ -281,4 +630,15 @@ MCP_TOOLS = {
     "storage_detach": {"method": "detach_storage_domain", "description": "分离存储域"},
     "storage_attach_to_dc": {"method": "attach_storage_domain", "description": "附加存储域到数据中心"},
     "storage_stats": {"method": "get_storage_domain_stats", "description": "获取存储域统计信息"},
+
+    # 新增工具
+    "storage_refresh": {"method": "refresh_storage_domain", "description": "刷新存储域"},
+    "storage_update": {"method": "update_storage_domain", "description": "更新存储域配置"},
+    "storage_files": {"method": "list_storage_files", "description": "列出存储域的文件"},
+    "storage_connections_list": {"method": "list_storage_connections", "description": "列出存储连接"},
+    "storage_available_disks": {"method": "list_available_disks", "description": "列出存储域上的可用磁盘"},
+    "storage_export_vms": {"method": "list_export_vms", "description": "列出导出域上的 VM"},
+    "storage_import_vm": {"method": "import_vm_from_export", "description": "从导出域导入 VM"},
+    "disk_snapshot_list": {"method": "list_disk_snapshots", "description": "列出磁盘快照"},
+    "iscsi_bond_list": {"method": "list_iscsi_bonds", "description": "列出 iSCSI Bond"},
 }

@@ -366,9 +366,261 @@ class AffinityMCP:
         except Exception as e:
             raise RuntimeError(f"从亲和性组移除 VM 失败: {e}")
 
+    # ── Affinity Label 管理 ──────────────────────────────────────────────────
+
+    def _find_affinity_label(self, name_or_id: str) -> Optional[Any]:
+        """查找亲和性标签"""
+        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
+
+        try:
+            label = labels_service.affinity_label_service(name_or_id).get()
+            if label:
+                return label
+        except Exception:
+            pass
+
+        labels = labels_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
+        return labels[0] if labels else None
+
+    def list_affinity_labels(self) -> List[Dict]:
+        """列出亲和性标签
+
+        Returns:
+            亲和性标签列表
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
+
+        try:
+            labels = labels_service.list()
+        except Exception as e:
+            logger.error(f"获取亲和性标签失败: {e}")
+            return []
+
+        return [
+            {
+                "id": l.id,
+                "name": l.name,
+                "description": l.read_only if hasattr(l, 'read_only') else False,
+                "vm_count": len(l.vms) if l.vms else 0,
+                "host_count": len(l.hosts) if l.hosts else 0,
+            }
+            for l in labels
+        ]
+
+    def get_affinity_label(self, name_or_id: str) -> Optional[Dict]:
+        """获取亲和性标签详情
+
+        Args:
+            name_or_id: 标签名称或 ID
+
+        Returns:
+            标签详情
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        label = self._find_affinity_label(name_or_id)
+        if not label:
+            return None
+
+        # 获取关联的 VM
+        vms = []
+        if label.vms:
+            vms = [
+                {"id": vm.id, "name": vm.name}
+                for vm in label.vms
+            ]
+
+        # 获取关联的主机
+        hosts = []
+        if label.hosts:
+            hosts = [
+                {"id": h.id, "name": h.name}
+                for h in label.hosts
+            ]
+
+        return {
+            "id": label.id,
+            "name": label.name,
+            "read_only": label.read_only if hasattr(label, 'read_only') else False,
+            "vms": vms,
+            "vm_count": len(vms),
+            "hosts": hosts,
+            "host_count": len(hosts),
+        }
+
+    def create_affinity_label(self, name: str) -> Dict[str, Any]:
+        """创建亲和性标签
+
+        Args:
+            name: 标签名称
+
+        Returns:
+            创建结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
+
+        # 检查是否已存在
+        existing = labels_service.list(search=f"name={_sanitize_search_value(name)}")
+        if existing:
+            raise ValueError(f"亲和性标签已存在: {name}")
+
+        try:
+            label = labels_service.add(
+                sdk.types.AffinityLabel(name=name)
+            )
+
+            return {
+                "success": True,
+                "message": f"亲和性标签 {name} 已创建",
+                "label_id": label.id,
+            }
+        except Exception as e:
+            raise RuntimeError(f"创建亲和性标签失败: {e}")
+
+    def delete_affinity_label(self, name_or_id: str) -> Dict[str, Any]:
+        """删除亲和性标签
+
+        Args:
+            name_or_id: 标签名称或 ID
+
+        Returns:
+            删除结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        label = self._find_affinity_label(name_or_id)
+        if not label:
+            raise ValueError(f"亲和性标签不存在: {name_or_id}")
+
+        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
+        label_service = labels_service.affinity_label_service(label.id)
+
+        try:
+            label_service.remove()
+            return {"success": True, "message": f"亲和性标签 {label.name} 已删除"}
+        except Exception as e:
+            raise RuntimeError(f"删除亲和性标签失败: {e}")
+
+    def assign_affinity_label(self, label: str, resource_type: str,
+                             resource: str) -> Dict[str, Any]:
+        """为资源分配亲和性标签
+
+        Args:
+            label: 标签名称或 ID
+            resource_type: 资源类型（vm 或 host）
+            resource: 资源名称或 ID
+
+        Returns:
+            分配结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        if resource_type.lower() not in ["vm", "host"]:
+            raise ValueError("resource_type 必须是 'vm' 或 'host'")
+
+        label_obj = self._find_affinity_label(label)
+        if not label_obj:
+            raise ValueError(f"亲和性标签不存在: {label}")
+
+        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
+        label_service = labels_service.affinity_label_service(label_obj.id)
+
+        try:
+            if resource_type.lower() == "vm":
+                vm = self._find_vm(resource)
+                if not vm:
+                    raise ValueError(f"VM 不存在: {resource}")
+                vms_service = label_service.vms_service()
+                vms_service.add(sdk.types.Vm(id=vm.id))
+            else:
+                host = self._find_host(resource)
+                if not host:
+                    raise ValueError(f"主机不存在: {resource}")
+                hosts_service = label_service.hosts_service()
+                hosts_service.add(sdk.types.Host(id=host.id))
+
+            return {
+                "success": True,
+                "message": f"亲和性标签 {label_obj.name} 已分配给 {resource_type}",
+            }
+        except Exception as e:
+            raise RuntimeError(f"分配亲和性标签失败: {e}")
+
+    def unassign_affinity_label(self, label: str, resource_type: str,
+                               resource: str) -> Dict[str, Any]:
+        """移除资源的亲和性标签
+
+        Args:
+            label: 标签名称或 ID
+            resource_type: 资源类型（vm 或 host）
+            resource: 资源名称或 ID
+
+        Returns:
+            移除结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        if resource_type.lower() not in ["vm", "host"]:
+            raise ValueError("resource_type 必须是 'vm' 或 'host'")
+
+        label_obj = self._find_affinity_label(label)
+        if not label_obj:
+            raise ValueError(f"亲和性标签不存在: {label}")
+
+        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
+        label_service = labels_service.affinity_label_service(label_obj.id)
+
+        try:
+            if resource_type.lower() == "vm":
+                vm = self._find_vm(resource)
+                if not vm:
+                    raise ValueError(f"VM 不存在: {resource}")
+                vms_service = label_service.vms_service()
+                vm_service = vms_service.vm_service(vm.id)
+                vm_service.remove()
+            else:
+                host = self._find_host(resource)
+                if not host:
+                    raise ValueError(f"主机不存在: {resource}")
+                hosts_service = label_service.hosts_service()
+                host_service = hosts_service.host_service(host.id)
+                host_service.remove()
+
+            return {
+                "success": True,
+                "message": f"亲和性标签 {label_obj.name} 已从 {resource_type} 移除",
+            }
+        except Exception as e:
+            raise RuntimeError(f"移除亲和性标签失败: {e}")
+
+    def _find_host(self, name_or_id: str) -> Optional[Any]:
+        """查找主机"""
+        hosts_service = self.ovirt.connection.system_service().hosts_service()
+
+        try:
+            host = hosts_service.host_service(name_or_id).get()
+            if host:
+                return host
+        except Exception:
+            pass
+
+        hosts = hosts_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
+        return hosts[0] if hosts else None
+
 
 # MCP 工具注册表
 MCP_TOOLS = {
+    # 亲和性组
     "affinity_group_list": {"method": "list_affinity_groups", "description": "列出亲和性组"},
     "affinity_group_get": {"method": "get_affinity_group", "description": "获取亲和性组详情"},
     "affinity_group_create": {"method": "create_affinity_group", "description": "创建亲和性组"},
@@ -376,4 +628,12 @@ MCP_TOOLS = {
     "affinity_group_delete": {"method": "delete_affinity_group", "description": "删除亲和性组"},
     "affinity_group_add_vm": {"method": "add_vm_to_affinity_group", "description": "添加 VM 到亲和性组"},
     "affinity_group_remove_vm": {"method": "remove_vm_from_affinity_group", "description": "从亲和性组移除 VM"},
+
+    # 亲和性标签
+    "affinity_label_list": {"method": "list_affinity_labels", "description": "列出亲和性标签"},
+    "affinity_label_get": {"method": "get_affinity_label", "description": "获取亲和性标签详情"},
+    "affinity_label_create": {"method": "create_affinity_label", "description": "创建亲和性标签"},
+    "affinity_label_delete": {"method": "delete_affinity_label", "description": "删除亲和性标签"},
+    "affinity_label_assign": {"method": "assign_affinity_label", "description": "为资源分配亲和性标签"},
+    "affinity_label_unassign": {"method": "unassign_affinity_label", "description": "移除资源的亲和性标签"},
 }

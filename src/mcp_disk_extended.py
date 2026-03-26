@@ -254,6 +254,120 @@ class DiskExtendedMCP:
             "sparse": disk.sparse if hasattr(disk, 'sparse') else True,
         }
 
+    def update_disk(self, name_or_id: str, new_name: str = None,
+                   description: str = None, shareable: bool = None,
+                   wipe_after_delete: bool = None) -> Dict[str, Any]:
+        """更新磁盘配置
+
+        Args:
+            name_or_id: 磁盘名称或 ID
+            new_name: 新名称
+            description: 新描述
+            shareable: 是否可共享
+            wipe_after_delete: 删除后擦除
+
+        Returns:
+            更新结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        disk = self._find_disk(name_or_id)
+        if not disk:
+            raise ValueError(f"磁盘不存在: {name_or_id}")
+
+        disk_service = self.ovirt.connection.system_service().disks_service().disk_service(disk.id)
+
+        if new_name:
+            disk.name = new_name
+        if description is not None:
+            disk.description = description
+        if shareable is not None:
+            disk.shareable = shareable
+        if wipe_after_delete is not None:
+            disk.wipe_after_delete = wipe_after_delete
+
+        try:
+            disk_service.update(disk)
+            return {"success": True, "message": f"磁盘配置已更新"}
+        except Exception as e:
+            raise RuntimeError(f"更新磁盘失败: {e}")
+
+    def sparsify_disk(self, name_or_id: str) -> Dict[str, Any]:
+        """精简磁盘（消除空白块）
+
+        Args:
+            name_or_id: 磁盘名称或 ID
+
+        Returns:
+            操作结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        disk = self._find_disk(name_or_id)
+        if not disk:
+            raise ValueError(f"磁盘不存在: {name_or_id}")
+
+        # 检查磁盘格式
+        if disk.format and disk.format.value != "cow":
+            raise ValueError("只有 COW 格式的磁盘支持精简操作")
+
+        disk_service = self.ovirt.connection.system_service().disks_service().disk_service(disk.id)
+
+        try:
+            disk_service.sparsify()
+            return {
+                "success": True,
+                "message": f"磁盘 {disk.name} 精简任务已启动",
+                "disk_id": disk.id,
+            }
+        except Exception as e:
+            raise RuntimeError(f"精简磁盘失败: {e}")
+
+    def export_disk(self, name_or_id: str, export_domain: str) -> Dict[str, Any]:
+        """导出磁盘到导出域
+
+        Args:
+            name_or_id: 磁盘名称或 ID
+            export_domain: 导出域名称
+
+        Returns:
+            导出结果
+        """
+        if not self.ovirt.connected:
+            raise RuntimeError("未连接到 oVirt")
+
+        disk = self._find_disk(name_or_id)
+        if not disk:
+            raise ValueError(f"磁盘不存在: {name_or_id}")
+
+        # 查找导出域
+        sds = self.ovirt.connection.system_service().storage_domains_service().list(
+            search=f"name={_sanitize_search_value(export_domain)}"
+        )
+        if not sds:
+            raise ValueError(f"存储域不存在: {export_domain}")
+
+        # 检查是否为导出域
+        if sds[0].type and sds[0].type.value != "export":
+            raise ValueError(f"存储域 {export_domain} 不是导出域")
+
+        disk_service = self.ovirt.connection.system_service().disks_service().disk_service(disk.id)
+
+        try:
+            disk_service.export(
+                storage_domain=sdk.types.StorageDomain(id=sds[0].id)
+            )
+            return {
+                "success": True,
+                "message": f"磁盘 {disk.name} 导出任务已启动",
+                "disk_id": disk.id,
+                "export_domain": export_domain,
+            }
+        except Exception as e:
+            raise RuntimeError(f"导出磁盘失败: {e}")
+
 
 # MCP 工具注册表
 MCP_TOOLS = {
@@ -263,4 +377,9 @@ MCP_TOOLS = {
     "disk_detach": {"method": "detach_disk", "description": "从虚拟机分离磁盘"},
     "disk_move": {"method": "move_disk", "description": "移动磁盘到另一个存储域"},
     "disk_stats": {"method": "get_disk_stats", "description": "获取磁盘统计信息"},
+
+    # 新增工具
+    "disk_update": {"method": "update_disk", "description": "更新磁盘配置"},
+    "disk_sparsify": {"method": "sparsify_disk", "description": "精简磁盘（消除空白块）"},
+    "disk_export": {"method": "export_disk", "description": "导出磁盘到导出域"},
 }
