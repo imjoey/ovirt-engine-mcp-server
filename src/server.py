@@ -44,6 +44,10 @@ from .mcp_disk_extended import DiskExtendedMCP, MCP_TOOLS as DISK_EXTENDED_MCP_T
 from .mcp_events import EventsMCP, MCP_TOOLS as EVENTS_MCP_TOOLS
 from .mcp_affinity import AffinityMCP, MCP_TOOLS as AFFINITY_MCP_TOOLS
 from .mcp_rbac import RbacMCP, MCP_TOOLS as RBAC_MCP_TOOLS
+from .mcp_vm_extended import VmExtendedMCP, MCP_TOOLS as VM_EXTENDED_MCP_TOOLS
+from .mcp_template_extended import TemplateExtendedMCP, MCP_TOOLS as TEMPLATE_EXTENDED_MCP_TOOLS
+from .mcp_quota import QuotaMCP, MCP_TOOLS as QUOTA_MCP_TOOLS
+from .mcp_system import SystemMCP, MCP_TOOLS as SYSTEM_MCP_TOOLS
 
 # 合并所有 MCP_TOOLS
 MCP_TOOLS = {
@@ -55,6 +59,10 @@ MCP_TOOLS = {
     **EVENTS_MCP_TOOLS,
     **AFFINITY_MCP_TOOLS,
     **RBAC_MCP_TOOLS,
+    **VM_EXTENDED_MCP_TOOLS,
+    **TEMPLATE_EXTENDED_MCP_TOOLS,
+    **QUOTA_MCP_TOOLS,
+    **SYSTEM_MCP_TOOLS,
 }
 
 logger = logging.getLogger(__name__)
@@ -679,6 +687,657 @@ TOOL_SCHEMAS: Dict[str, dict] = {
         },
         "required": ["resource_type", "resource_id"],
     },
+
+    # ── VM Extended tools ─────────────────────────────────────────────────────
+    "vm_migrate": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 名称或 ID"},
+            "target_host": {"type": "string", "description": "目标主机名称或 ID（可选）"},
+        },
+        "required": ["name_or_id"],
+    },
+    "vm_console": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 名称或 ID"},
+            "console_type": {"type": "string", "description": "控制台类型（spice/vnc），默认 spice"},
+        },
+        "required": ["name_or_id"],
+    },
+    "vm_cdrom_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "VM 名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "vm_cdrom_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 名称或 ID"},
+            "cdrom_id": {"type": "string", "description": "CDROM ID"},
+            "iso_file": {"type": "string", "description": "ISO 文件路径"},
+            "eject": {"type": "boolean", "description": "是否弹出光盘"},
+        },
+        "required": ["name_or_id", "cdrom_id"],
+    },
+    "vm_hostdevice_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "VM 名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "vm_hostdevice_attach": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 名称或 ID"},
+            "device_name": {"type": "string", "description": "设备名称"},
+        },
+        "required": ["name_or_id", "device_name"],
+    },
+    "vm_hostdevice_detach": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 名称或 ID"},
+            "device_name": {"type": "string", "description": "设备名称"},
+        },
+        "required": ["name_or_id", "device_name"],
+    },
+    "vm_mediated_device_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "VM 名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "vm_numa_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "VM 名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "vm_watchdog_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "VM 名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "vm_watchdog_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 名称或 ID"},
+            "watchdog_id": {"type": "string", "description": "Watchdog ID"},
+            "action": {"type": "string", "description": "触发动作（none/reset/poweroff/shutdown/dump）"},
+        },
+        "required": ["name_or_id", "watchdog_id"],
+    },
+    "vm_pin_to_host": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 名称或 ID"},
+            "host": {"type": "string", "description": "主机名称或 ID"},
+            "pin_policy": {"type": "string", "description": "固定策略（user/resizable/migratable）"},
+        },
+        "required": ["name_or_id", "host"],
+    },
+    "vm_session_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "VM 名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "vm_pool_list": {
+        "type": "object",
+        "properties": {"cluster": {"type": "string", "description": "集群名称（可选）"}},
+    },
+    "vm_pool_get": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "VM 池名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "vm_pool_create": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "池名称"},
+            "template": {"type": "string", "description": "模板名称"},
+            "cluster": {"type": "string", "description": "集群名称"},
+            "size": {"type": "number", "description": "池大小，默认 5"},
+            "description": {"type": "string", "description": "描述"},
+            "max_user_vms": {"type": "number", "description": "每用户最大 VM 数，默认 1"},
+            "prestarted_vms": {"type": "number", "description": "预启动 VM 数，默认 0"},
+            "stateful": {"type": "boolean", "description": "是否有状态，默认 false"},
+        },
+        "required": ["name", "template", "cluster"],
+    },
+    "vm_pool_delete": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 池名称或 ID"},
+            "force": {"type": "boolean", "description": "强制删除"},
+        },
+        "required": ["name_or_id"],
+    },
+    "vm_pool_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 池名称或 ID"},
+            "new_name": {"type": "string", "description": "新名称"},
+            "size": {"type": "number", "description": "新大小"},
+            "description": {"type": "string", "description": "新描述"},
+            "prestarted_vms": {"type": "number", "description": "预启动 VM 数"},
+        },
+        "required": ["name_or_id"],
+    },
+    "vm_checkpoint_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "VM 名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "vm_checkpoint_create": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 名称或 ID"},
+            "description": {"type": "string", "description": "检查点描述"},
+        },
+        "required": ["name_or_id"],
+    },
+    "vm_checkpoint_restore": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 名称或 ID"},
+            "checkpoint_id": {"type": "string", "description": "检查点 ID"},
+        },
+        "required": ["name_or_id", "checkpoint_id"],
+    },
+    "vm_checkpoint_delete": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "VM 名称或 ID"},
+            "checkpoint_id": {"type": "string", "description": "检查点 ID"},
+        },
+        "required": ["name_or_id", "checkpoint_id"],
+    },
+
+    # ── Template Extended tools ───────────────────────────────────────────────
+    "template_get": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "模板名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "template_create": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "模板名称"},
+            "vm": {"type": "string", "description": "源虚拟机名称或 ID"},
+            "description": {"type": "string", "description": "描述"},
+            "cluster": {"type": "string", "description": "目标集群（可选）"},
+        },
+        "required": ["name", "vm"],
+    },
+    "template_delete": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "模板名称或 ID"},
+            "force": {"type": "boolean", "description": "强制删除"},
+        },
+        "required": ["name_or_id"],
+    },
+    "template_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "模板名称或 ID"},
+            "new_name": {"type": "string", "description": "新名称"},
+            "description": {"type": "string", "description": "新描述"},
+            "memory_mb": {"type": "number", "description": "内存（MB）"},
+            "cpu_cores": {"type": "number", "description": "CPU 核数"},
+        },
+        "required": ["name_or_id"],
+    },
+    "template_disk_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "模板名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "template_nic_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "模板名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "instance_type_list": {"type": "object", "properties": {}},
+    "instance_type_get": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "实例类型名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+
+    # ── Quota tools ───────────────────────────────────────────────────────────
+    "quota_list": {
+        "type": "object",
+        "properties": {"datacenter": {"type": "string", "description": "数据中心名称或 ID"}},
+        "required": ["datacenter"],
+    },
+    "quota_get": {
+        "type": "object",
+        "properties": {
+            "datacenter": {"type": "string", "description": "数据中心名称或 ID"},
+            "name_or_id": {"type": "string", "description": "配额名称或 ID"},
+        },
+        "required": ["datacenter", "name_or_id"],
+    },
+    "quota_create": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "配额名称"},
+            "datacenter": {"type": "string", "description": "数据中心名称"},
+            "description": {"type": "string", "description": "描述"},
+            "cluster_hard_limit_pct": {"type": "number", "description": "集群硬限制百分比"},
+            "storage_hard_limit_pct": {"type": "number", "description": "存储硬限制百分比"},
+        },
+        "required": ["name", "datacenter"],
+    },
+    "quota_update": {
+        "type": "object",
+        "properties": {
+            "datacenter": {"type": "string", "description": "数据中心名称或 ID"},
+            "name_or_id": {"type": "string", "description": "配额名称或 ID"},
+            "new_name": {"type": "string", "description": "新名称"},
+            "description": {"type": "string", "description": "新描述"},
+            "cluster_hard_limit_pct": {"type": "number", "description": "集群硬限制百分比"},
+            "storage_hard_limit_pct": {"type": "number", "description": "存储硬限制百分比"},
+        },
+        "required": ["datacenter", "name_or_id"],
+    },
+    "quota_delete": {
+        "type": "object",
+        "properties": {
+            "datacenter": {"type": "string", "description": "数据中心名称或 ID"},
+            "name_or_id": {"type": "string", "description": "配额名称或 ID"},
+        },
+        "required": ["datacenter", "name_or_id"],
+    },
+    "quota_cluster_limit_list": {
+        "type": "object",
+        "properties": {
+            "datacenter": {"type": "string", "description": "数据中心名称或 ID"},
+            "name_or_id": {"type": "string", "description": "配额名称或 ID"},
+        },
+        "required": ["datacenter", "name_or_id"],
+    },
+    "quota_storage_limit_list": {
+        "type": "object",
+        "properties": {
+            "datacenter": {"type": "string", "description": "数据中心名称或 ID"},
+            "name_or_id": {"type": "string", "description": "配额名称或 ID"},
+        },
+        "required": ["datacenter", "name_or_id"],
+    },
+
+    # ── System tools ──────────────────────────────────────────────────────────
+    "system_get": {"type": "object", "properties": {}},
+    "system_option_list": {
+        "type": "object",
+        "properties": {"category": {"type": "string", "description": "选项分类（可选）"}},
+    },
+    "job_list": {
+        "type": "object",
+        "properties": {
+            "page": {"type": "number", "description": "页码"},
+            "page_size": {"type": "number", "description": "每页数量"},
+        },
+    },
+    "job_get": {
+        "type": "object",
+        "properties": {"job_id": {"type": "string", "description": "任务 ID"}},
+        "required": ["job_id"],
+    },
+    "job_cancel": {
+        "type": "object",
+        "properties": {
+            "job_id": {"type": "string", "description": "任务 ID"},
+            "force": {"type": "boolean", "description": "强制取消"},
+        },
+        "required": ["job_id"],
+    },
+    "system_statistics": {"type": "object", "properties": {}},
+
+    # ── Network Extended tools ────────────────────────────────────────────────
+    "network_get": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "网络名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "vnic_profile_list": {
+        "type": "object",
+        "properties": {"network": {"type": "string", "description": "网络名称（可选）"}},
+    },
+    "vnic_profile_get": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "Profile 名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "vnic_profile_create": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Profile 名称"},
+            "network": {"type": "string", "description": "网络名称"},
+            "description": {"type": "string", "description": "描述"},
+            "port_mirroring": {"type": "boolean", "description": "是否启用端口镜像"},
+        },
+        "required": ["name", "network"],
+    },
+    "vnic_profile_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "Profile 名称或 ID"},
+            "new_name": {"type": "string", "description": "新名称"},
+            "description": {"type": "string", "description": "新描述"},
+            "port_mirroring": {"type": "boolean", "description": "端口镜像设置"},
+        },
+        "required": ["name_or_id"],
+    },
+    "vnic_profile_delete": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "Profile 名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "network_filter_list": {"type": "object", "properties": {}},
+    "mac_pool_list": {"type": "object", "properties": {}},
+    "qos_list": {
+        "type": "object",
+        "properties": {"datacenter": {"type": "string", "description": "数据中心名称（可选）"}},
+    },
+
+    # ── Cluster Extended tools ────────────────────────────────────────────────
+    "cluster_create": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "集群名称"},
+            "datacenter": {"type": "string", "description": "数据中心名称"},
+            "cpu_type": {"type": "string", "description": "CPU 类型"},
+            "description": {"type": "string", "description": "描述"},
+            "gluster_service": {"type": "boolean", "description": "是否启用 Gluster 服务"},
+            "threads_per_core": {"type": "number", "description": "每核心线程数"},
+        },
+        "required": ["name", "datacenter", "cpu_type"],
+    },
+    "cluster_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "集群名称或 ID"},
+            "new_name": {"type": "string", "description": "新名称"},
+            "description": {"type": "string", "description": "新描述"},
+            "threads_per_core": {"type": "number", "description": "每核心线程数"},
+        },
+        "required": ["name_or_id"],
+    },
+    "cluster_delete": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "集群名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "cpu_profile_list": {
+        "type": "object",
+        "properties": {"cluster": {"type": "string", "description": "集群名称或 ID"}},
+        "required": ["cluster"],
+    },
+    "cpu_profile_get": {
+        "type": "object",
+        "properties": {
+            "cluster": {"type": "string", "description": "集群名称或 ID"},
+            "name_or_id": {"type": "string", "description": "Profile 名称或 ID"},
+        },
+        "required": ["cluster", "name_or_id"],
+    },
+
+    # ── Host Extended tools ───────────────────────────────────────────────────
+    "host_nic_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "主机名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "host_nic_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "主机名称或 ID"},
+            "nic_name": {"type": "string", "description": "网卡名称"},
+            "custom_properties": {"type": "object", "description": "自定义属性"},
+        },
+        "required": ["name_or_id", "nic_name"],
+    },
+    "host_numa_get": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "主机名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "host_hook_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "主机名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "host_fence": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "主机名称或 ID"},
+            "action": {"type": "string", "description": "操作类型（restart/start/stop/status）"},
+        },
+        "required": ["name_or_id"],
+    },
+    "host_network_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "主机名称或 ID"},
+            "network": {"type": "string", "description": "网络名称"},
+            "nic": {"type": "string", "description": "网卡名称（可选）"},
+            "vlan_id": {"type": "number", "description": "VLAN ID（可选）"},
+            "bond": {"type": "string", "description": "绑定接口名称（可选）"},
+        },
+        "required": ["name_or_id", "network"],
+    },
+    "host_device_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "主机名称或 ID"},
+            "device_name": {"type": "string", "description": "设备名称"},
+            "enabled": {"type": "boolean", "description": "是否启用"},
+        },
+        "required": ["name_or_id", "device_name"],
+    },
+    "host_storage_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "主机名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "host_install": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "主机名称或 ID"},
+            "root_password": {"type": "string", "description": "root 密码"},
+            "ssh_key": {"type": "string", "description": "SSH 公钥"},
+            "override_iptables": {"type": "boolean", "description": "覆盖 iptables 规则"},
+        },
+        "required": ["name_or_id"],
+    },
+    "host_iscsi_discover": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "主机名称或 ID"},
+            "address": {"type": "string", "description": "iSCSI 目标地址"},
+            "port": {"type": "number", "description": "端口号，默认 3260"},
+            "username": {"type": "string", "description": "CHAP 用户名（可选）"},
+            "password": {"type": "string", "description": "CHAP 密码（可选）"},
+        },
+        "required": ["name_or_id", "address"],
+    },
+    "host_iscsi_login": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "主机名称或 ID"},
+            "address": {"type": "string", "description": "iSCSI 目标地址"},
+            "target": {"type": "string", "description": "目标名称"},
+            "port": {"type": "number", "description": "端口号，默认 3260"},
+            "username": {"type": "string", "description": "CHAP 用户名（可选）"},
+            "password": {"type": "string", "description": "CHAP 密码（可选）"},
+        },
+        "required": ["name_or_id", "address", "target"],
+    },
+
+    # ── Storage Extended tools ────────────────────────────────────────────────
+    "storage_refresh": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "存储域名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "storage_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "存储域名称或 ID"},
+            "new_name": {"type": "string", "description": "新名称"},
+            "description": {"type": "string", "description": "新描述"},
+            "warning_low_space": {"type": "number", "description": "低空间警告阈值（GB）"},
+            "critical_low_space": {"type": "number", "description": "临界空间阈值（GB）"},
+        },
+        "required": ["name_or_id"],
+    },
+    "storage_files": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "存储域名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "storage_connections_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "存储域名称或 ID（可选）"}},
+    },
+    "storage_available_disks": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "存储域名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "storage_export_vms": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "导出域名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "storage_import_vm": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "导出域名称或 ID"},
+            "vm_name": {"type": "string", "description": "要导入的 VM 名称"},
+            "cluster": {"type": "string", "description": "目标集群"},
+            "storage_domain": {"type": "string", "description": "目标存储域（可选）"},
+            "clone": {"type": "boolean", "description": "是否克隆"},
+        },
+        "required": ["name_or_id", "vm_name", "cluster"],
+    },
+    "disk_snapshot_list": {
+        "type": "object",
+        "properties": {"disk_name_or_id": {"type": "string", "description": "磁盘名称或 ID"}},
+        "required": ["disk_name_or_id"],
+    },
+    "iscsi_bond_list": {"type": "object", "properties": {}},
+
+    # ── Disk Extended tools ───────────────────────────────────────────────────
+    "disk_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "磁盘名称或 ID"},
+            "new_name": {"type": "string", "description": "新名称"},
+            "description": {"type": "string", "description": "新描述"},
+            "shareable": {"type": "boolean", "description": "是否可共享"},
+            "wipe_after_delete": {"type": "boolean", "description": "删除后擦除"},
+        },
+        "required": ["name_or_id"],
+    },
+    "disk_sparsify": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "磁盘名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "disk_export": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "磁盘名称或 ID"},
+            "export_domain": {"type": "string", "description": "导出域名称"},
+        },
+        "required": ["name_or_id", "export_domain"],
+    },
+
+    # ── Events Extended tools ─────────────────────────────────────────────────
+    "event_subscription_list": {
+        "type": "object",
+        "properties": {"user": {"type": "string", "description": "用户名称（可选）"}},
+    },
+    "bookmark_list": {"type": "object", "properties": {}},
+
+    # ── Affinity Extended tools ───────────────────────────────────────────────
+    "affinity_label_list": {"type": "object", "properties": {}},
+    "affinity_label_get": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "标签名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "affinity_label_create": {
+        "type": "object",
+        "properties": {"name": {"type": "string", "description": "标签名称"}},
+        "required": ["name"],
+    },
+    "affinity_label_delete": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "标签名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "affinity_label_assign": {
+        "type": "object",
+        "properties": {
+            "label": {"type": "string", "description": "标签名称或 ID"},
+            "resource_type": {"type": "string", "description": "资源类型（vm 或 host）"},
+            "resource": {"type": "string", "description": "资源名称或 ID"},
+        },
+        "required": ["label", "resource_type", "resource"],
+    },
+    "affinity_label_unassign": {
+        "type": "object",
+        "properties": {
+            "label": {"type": "string", "description": "标签名称或 ID"},
+            "resource_type": {"type": "string", "description": "资源类型（vm 或 host）"},
+            "resource": {"type": "string", "description": "资源名称或 ID"},
+        },
+        "required": ["label", "resource_type", "resource"],
+    },
+
+    # ── RBAC Extended tools ───────────────────────────────────────────────────
+    "user_create": {
+        "type": "object",
+        "properties": {
+            "username": {"type": "string", "description": "用户名"},
+            "email": {"type": "string", "description": "邮箱"},
+            "first_name": {"type": "string", "description": "名"},
+            "last_name": {"type": "string", "description": "姓"},
+        },
+        "required": ["username"],
+    },
+    "user_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "用户名称或 ID"},
+            "email": {"type": "string", "description": "新邮箱"},
+            "first_name": {"type": "string", "description": "新名"},
+            "last_name": {"type": "string", "description": "新姓"},
+        },
+        "required": ["name_or_id"],
+    },
+    "user_delete": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "用户名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "user_group_list": {
+        "type": "object",
+        "properties": {"name_or_id": {"type": "string", "description": "用户名称或 ID"}},
+        "required": ["name_or_id"],
+    },
+    "role_update": {
+        "type": "object",
+        "properties": {
+            "name_or_id": {"type": "string", "description": "角色名称或 ID"},
+            "new_name": {"type": "string", "description": "新名称"},
+            "description": {"type": "string", "description": "新描述"},
+        },
+        "required": ["name_or_id"],
+    },
+    "filter_list": {"type": "object", "properties": {}},
 }
 
 DEFAULT_SCHEMA = {"type": "object", "properties": {}}
@@ -744,11 +1403,16 @@ EXTENSION_METHODS = {
     # RbacMCP
     "list_users": "rbac_mcp",
     "get_user": "rbac_mcp",
+    "create_user": "rbac_mcp",
+    "update_user": "rbac_mcp",
+    "delete_user": "rbac_mcp",
+    "list_user_groups": "rbac_mcp",
     "list_groups": "rbac_mcp",
     "get_group": "rbac_mcp",
     "list_roles": "rbac_mcp",
     "get_role": "rbac_mcp",
     "create_role": "rbac_mcp",
+    "update_role": "rbac_mcp",
     "delete_role": "rbac_mcp",
     "list_permits": "rbac_mcp",
     "list_permissions": "rbac_mcp",
@@ -760,6 +1424,117 @@ EXTENSION_METHODS = {
     "assign_tag": "rbac_mcp",
     "unassign_tag": "rbac_mcp",
     "list_resource_tags": "rbac_mcp",
+    "list_filters": "rbac_mcp",
+
+    # VmExtendedMCP
+    "migrate_vm": "vm_extended_mcp",
+    "get_vm_console": "vm_extended_mcp",
+    "list_vm_cdroms": "vm_extended_mcp",
+    "update_vm_cdrom": "vm_extended_mcp",
+    "list_vm_host_devices": "vm_extended_mcp",
+    "attach_vm_host_device": "vm_extended_mcp",
+    "detach_vm_host_device": "vm_extended_mcp",
+    "list_vm_mediated_devices": "vm_extended_mcp",
+    "list_vm_numa_nodes": "vm_extended_mcp",
+    "list_vm_watchdogs": "vm_extended_mcp",
+    "update_vm_watchdog": "vm_extended_mcp",
+    "pin_vm_to_host": "vm_extended_mcp",
+    "list_vm_sessions": "vm_extended_mcp",
+    "list_vm_pools": "vm_extended_mcp",
+    "get_vm_pool": "vm_extended_mcp",
+    "create_vm_pool": "vm_extended_mcp",
+    "delete_vm_pool": "vm_extended_mcp",
+    "update_vm_pool": "vm_extended_mcp",
+    "list_vm_checkpoints": "vm_extended_mcp",
+    "create_vm_checkpoint": "vm_extended_mcp",
+    "restore_vm_checkpoint": "vm_extended_mcp",
+    "delete_vm_checkpoint": "vm_extended_mcp",
+
+    # TemplateExtendedMCP
+    "get_template_extended": "template_extended_mcp",
+    "create_template": "template_extended_mcp",
+    "delete_template": "template_extended_mcp",
+    "update_template": "template_extended_mcp",
+    "list_template_disks": "template_extended_mcp",
+    "list_template_nics": "template_extended_mcp",
+    "list_instance_types": "template_extended_mcp",
+    "get_instance_type": "template_extended_mcp",
+
+    # QuotaMCP
+    "list_quotas": "quota_mcp",
+    "get_quota": "quota_mcp",
+    "create_quota": "quota_mcp",
+    "update_quota": "quota_mcp",
+    "delete_quota": "quota_mcp",
+    "list_quota_cluster_limits": "quota_mcp",
+    "list_quota_storage_limits": "quota_mcp",
+
+    # SystemMCP
+    "get_system_info": "system_mcp",
+    "list_system_options": "system_mcp",
+    "list_jobs": "system_mcp",
+    "get_job": "system_mcp",
+    "cancel_job": "system_mcp",
+    "get_system_statistics": "system_mcp",
+
+    # NetworkMCP extended
+    "get_network": "network_mcp",
+    "list_vnic_profiles": "network_mcp",
+    "get_vnic_profile": "network_mcp",
+    "create_vnic_profile": "network_mcp",
+    "update_vnic_profile": "network_mcp",
+    "delete_vnic_profile": "network_mcp",
+    "list_network_filters": "network_mcp",
+    "list_mac_pools": "network_mcp",
+    "list_qos": "network_mcp",
+
+    # ClusterMCP extended
+    "create_cluster": "cluster_mcp",
+    "update_cluster": "cluster_mcp",
+    "delete_cluster": "cluster_mcp",
+    "list_cpu_profiles": "cluster_mcp",
+    "get_cpu_profile": "cluster_mcp",
+
+    # HostExtendedMCP extended
+    "list_host_nics": "host_extended_mcp",
+    "update_host_nic": "host_extended_mcp",
+    "get_host_numa": "host_extended_mcp",
+    "list_host_hooks": "host_extended_mcp",
+    "fence_host": "host_extended_mcp",
+    "update_host_network": "host_extended_mcp",
+    "update_host_device": "host_extended_mcp",
+    "list_host_storage": "host_extended_mcp",
+    "install_host": "host_extended_mcp",
+    "iscsi_discover": "host_extended_mcp",
+    "iscsi_login": "host_extended_mcp",
+
+    # StorageExtendedMCP extended
+    "refresh_storage_domain": "storage_extended_mcp",
+    "update_storage_domain": "storage_extended_mcp",
+    "list_storage_files": "storage_extended_mcp",
+    "list_storage_connections": "storage_extended_mcp",
+    "list_available_disks": "storage_extended_mcp",
+    "list_export_vms": "storage_extended_mcp",
+    "import_vm_from_export": "storage_extended_mcp",
+    "list_disk_snapshots": "storage_extended_mcp",
+    "list_iscsi_bonds": "storage_extended_mcp",
+
+    # DiskExtendedMCP extended
+    "update_disk": "disk_extended_mcp",
+    "sparsify_disk": "disk_extended_mcp",
+    "export_disk": "disk_extended_mcp",
+
+    # EventsMCP extended
+    "list_event_subscriptions": "events_mcp",
+    "list_bookmarks": "events_mcp",
+
+    # AffinityMCP extended
+    "list_affinity_labels": "affinity_mcp",
+    "get_affinity_label": "affinity_mcp",
+    "create_affinity_label": "affinity_mcp",
+    "delete_affinity_label": "affinity_mcp",
+    "assign_affinity_label": "affinity_mcp",
+    "unassign_affinity_label": "affinity_mcp",
 }
 
 
@@ -776,6 +1551,16 @@ class OvirtMCPServer:
         self.cluster_mcp = ClusterMCP(self.connection)
         self.template_mcp = TemplateMCP(self.connection)
         self.rbac_mcp = RbacMCP(self.connection)
+        self.datacenter_mcp = DataCenterMCP(self.connection)
+        self.host_extended_mcp = HostExtendedMCP(self.connection)
+        self.storage_extended_mcp = StorageExtendedMCP(self.connection)
+        self.disk_extended_mcp = DiskExtendedMCP(self.connection)
+        self.events_mcp = EventsMCP(self.connection)
+        self.affinity_mcp = AffinityMCP(self.connection)
+        self.vm_extended_mcp = VmExtendedMCP(self.connection)
+        self.template_extended_mcp = TemplateExtendedMCP(self.connection)
+        self.quota_mcp = QuotaMCP(self.connection)
+        self.system_mcp = SystemMCP(self.connection)
 
         # Build tool registry
         self.tool_handlers: Dict[str, Callable[..., Any]] = {}
