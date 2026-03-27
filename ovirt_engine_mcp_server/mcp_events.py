@@ -6,6 +6,8 @@ oVirt MCP Server - 事件管理模块
 from typing import Dict, List, Any, Optional
 import logging
 
+from .base_mcp import BaseMCP
+from .decorators import require_connection
 from .search_utils import sanitize_search_value as _sanitize_search_value
 
 try:
@@ -16,12 +18,13 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class EventsMCP:
+class EventsMCP(BaseMCP):
     """事件管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
+        super().__init__(ovirt_mcp)
 
+    @require_connection
     def list_events(self, search: str = None, severity: str = None,
                    page: int = 1, page_size: int = 50) -> List[Dict]:
         """列出事件
@@ -35,10 +38,7 @@ class EventsMCP:
         Returns:
             事件列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        events_service = self.ovirt.connection.system_service().events_service()
+        events_service = self.connection.system_service().events_service()
 
         # 构建搜索条件
         search_query = ""
@@ -98,13 +98,11 @@ class EventsMCP:
         """获取警告事件"""
         return self.list_events(severity="warning", page=page, page_size=page_size)
 
+    @require_connection
     def get_event(self, event_id: str) -> Optional[Dict]:
         """获取单个事件详情"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         try:
-            event_service = self.ovirt.connection.system_service().events_service().event_service(event_id)
+            event_service = self.connection.system_service().events_service().event_service(event_id)
             event = event_service.get()
 
             return {
@@ -151,6 +149,7 @@ class EventsMCP:
         """
         return self.list_events(search=query, page=page, page_size=page_size)
 
+    @require_connection
     def get_events_summary(self, hours: int = 24) -> Dict[str, Any]:
         """获取事件统计摘要
 
@@ -160,10 +159,7 @@ class EventsMCP:
         Returns:
             各级别事件数量统计
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        events_service = self.ovirt.connection.system_service().events_service()
+        events_service = self.connection.system_service().events_service()
 
         # 获取最近的事件（根据 SDK 支持的参数）
         try:
@@ -208,13 +204,11 @@ class EventsMCP:
 
         return summary
 
+    @require_connection
     def acknowledge_event(self, event_id: str) -> Dict[str, Any]:
         """确认事件"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         try:
-            event_service = self.ovirt.connection.system_service().events_service().event_service(event_id)
+            event_service = self.connection.system_service().events_service().event_service(event_id)
             # 标记为已读/已确认
             event = event_service.get()
             if hasattr(event, 'acknowledged'):
@@ -225,13 +219,11 @@ class EventsMCP:
         except Exception as e:
             raise RuntimeError(f"确认事件失败: {e}")
 
+    @require_connection
     def clear_alerts(self) -> Dict[str, Any]:
         """清除所有告警事件"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         try:
-            events_service = self.ovirt.connection.system_service().events_service()
+            events_service = self.connection.system_service().events_service()
             alerts = events_service.list(search="severity=alert")
 
             cleared_count = 0
@@ -253,6 +245,7 @@ class EventsMCP:
 
     # ── 事件订阅管理 ────────────────────────────────────────────────────────
 
+    @require_connection
     def list_event_subscriptions(self, user: str = None) -> List[Dict]:
         """列出事件订阅
 
@@ -262,11 +255,8 @@ class EventsMCP:
         Returns:
             事件订阅列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         try:
-            subscriptions_service = self.ovirt.connection.system_service().event_subscriptions_service()
+            subscriptions_service = self.connection.system_service().event_subscriptions_service()
 
             search = None
             if user:
@@ -291,17 +281,15 @@ class EventsMCP:
 
     # ── 书签管理 ────────────────────────────────────────────────────────────
 
+    @require_connection
     def list_bookmarks(self) -> List[Dict]:
         """列出书签
 
         Returns:
             书签列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         try:
-            bookmarks_service = self.ovirt.connection.system_service().bookmarks_service()
+            bookmarks_service = self.connection.system_service().bookmarks_service()
             bookmarks = bookmarks_service.list()
         except Exception as e:
             logger.error(f"获取书签列表失败: {e}")

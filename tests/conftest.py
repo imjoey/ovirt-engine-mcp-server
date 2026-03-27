@@ -53,7 +53,7 @@ mock_sdk.Connection = mock_connection
 sys.modules['ovirtsdk4'] = mock_sdk
 sys.modules['ovirtsdk4.types'] = mock_sdk.types
 
-from src.config import Config
+from ovirt_engine_mcp_server.config import Config
 
 
 @pytest.fixture

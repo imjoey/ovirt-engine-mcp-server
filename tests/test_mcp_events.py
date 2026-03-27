@@ -31,7 +31,7 @@ class TestEventsMCPListEvents:
 
     def test_list_events_empty(self):
         """测试空事件列表"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -48,7 +48,7 @@ class TestEventsMCPListEvents:
 
     def test_list_events_with_data(self):
         """测试有数据的事件列表"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_events = [
             _create_mock_event("event-1", "VM started", "normal"),
@@ -72,7 +72,7 @@ class TestEventsMCPListEvents:
 
     def test_list_events_with_severity_filter(self):
         """测试按严重级别过滤事件"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_events = [
             _create_mock_event("event-1", "Alert 1", "alert"),
@@ -97,7 +97,7 @@ class TestEventsMCPListEvents:
 
     def test_list_events_with_pagination(self):
         """测试分页获取事件"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_events = [_create_mock_event(f"event-{i}", f"Event {i}", "normal") for i in range(10)]
 
@@ -117,14 +117,15 @@ class TestEventsMCPListEvents:
 
     def test_list_events_not_connected(self):
         """测试未连接时抛出异常"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.errors import OvirtConnectionError
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = False
 
         events_mcp = EventsMCP(mock_ovirt)
 
-        with pytest.raises(RuntimeError, match="未连接"):
+        with pytest.raises(OvirtConnectionError):
             events_mcp.list_events()
 
 
@@ -133,7 +134,7 @@ class TestEventsMCPGetAlerts:
 
     def test_get_alerts(self):
         """测试获取告警事件"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_events = [
             _create_mock_event("event-1", "Alert 1", "alert"),
@@ -160,7 +161,7 @@ class TestEventsMCPGetErrors:
 
     def test_get_errors(self):
         """测试获取错误事件"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_events = [
             _create_mock_event("event-1", "Error 1", "error"),
@@ -187,7 +188,7 @@ class TestEventsMCPGetWarnings:
 
     def test_get_warnings(self):
         """测试获取警告事件"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_events = [
             _create_mock_event("event-1", "Warning 1", "warning"),
@@ -214,7 +215,7 @@ class TestEventsMCPGetEvent:
 
     def test_get_event_success(self):
         """测试获取单个事件详情"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_event = _create_mock_event()
         mock_event.cluster = MagicMock()
@@ -249,7 +250,7 @@ class TestEventsMCPGetEvent:
 
     def test_get_event_not_found(self):
         """测试事件不存在"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -273,7 +274,7 @@ class TestEventsMCPSearchEvents:
 
     def test_search_events(self):
         """测试搜索事件"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_events = [
             _create_mock_event("event-1", "VM started", "normal"),
@@ -298,7 +299,7 @@ class TestEventsMCPGetEventsSummary:
 
     def test_get_events_summary(self):
         """测试获取事件统计摘要"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_events = [
             _create_mock_event("event-1", "Alert 1", "alert"),
@@ -338,7 +339,7 @@ class TestEventsMCPAcknowledgeEvent:
 
     def test_acknowledge_event_success(self):
         """测试确认事件成功"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_event = _create_mock_event()
         mock_event.acknowledged = False
@@ -365,7 +366,7 @@ class TestEventsMCPClearAlerts:
 
     def test_clear_alerts(self):
         """测试清除告警事件"""
-        from src.mcp_events import EventsMCP
+        from ovirt_engine_mcp_server.mcp_events import EventsMCP
 
         mock_alerts = [
             _create_mock_event("event-1", "Alert 1", "alert"),
@@ -393,7 +394,7 @@ class TestEventsMCPTools:
 
     def test_mcp_tools_defined(self):
         """测试 MCP 工具注册表已定义"""
-        from src.mcp_events import MCP_TOOLS
+        from ovirt_engine_mcp_server.mcp_events import MCP_TOOLS
 
         expected_tools = [
             "event_list",

@@ -41,7 +41,7 @@ class TestStorageExtendedMCPGetStorageDomain:
 
     def test_get_storage_domain_by_id(self):
         """测试通过 ID 获取存储域"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_sd = _create_mock_storage_domain()
 
@@ -68,7 +68,7 @@ class TestStorageExtendedMCPGetStorageDomain:
 
     def test_get_storage_domain_not_found(self):
         """测试存储域不存在"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -86,7 +86,7 @@ class TestStorageExtendedMCPGetStorageDomain:
 
     def test_get_storage_domain_with_files(self):
         """测试获取存储域包含文件列表"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_sd = _create_mock_storage_domain()
         mock_file = MagicMock()
@@ -119,7 +119,7 @@ class TestStorageExtendedMCPCreateStorageDomain:
 
     def test_create_storage_domain_success(self):
         """测试创建存储域成功"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_sd = _create_mock_storage_domain()
         mock_host = MagicMock()
@@ -151,7 +151,7 @@ class TestStorageExtendedMCPCreateStorageDomain:
 
     def test_create_storage_domain_invalid_type(self):
         """测试无效的存储类型"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -163,7 +163,7 @@ class TestStorageExtendedMCPCreateStorageDomain:
 
     def test_create_storage_domain_host_not_found(self):
         """测试主机不存在"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -180,7 +180,7 @@ class TestStorageExtendedMCPCreateStorageDomain:
 
     def test_create_storage_domain_already_exists(self):
         """测试存储域已存在"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_sd = _create_mock_storage_domain()
         mock_host = MagicMock()
@@ -209,7 +209,7 @@ class TestStorageExtendedMCPDeleteStorageDomain:
 
     def test_delete_storage_domain_success(self):
         """测试删除存储域成功"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_sd = _create_mock_storage_domain()
         mock_sd_service = MagicMock()
@@ -233,7 +233,7 @@ class TestStorageExtendedMCPDeleteStorageDomain:
 
     def test_delete_storage_domain_not_found(self):
         """测试删除不存在的存储域"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -255,7 +255,7 @@ class TestStorageExtendedMCPDetachStorageDomain:
 
     def test_detach_storage_domain_success(self):
         """测试分离存储域成功"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_sd = _create_mock_storage_domain()
         mock_dc = _create_mock_datacenter()
@@ -289,7 +289,7 @@ class TestStorageExtendedMCPAttachStorageDomain:
 
     def test_attach_storage_domain_success(self):
         """测试附加存储域成功"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_sd = _create_mock_storage_domain()
         mock_dc = _create_mock_datacenter()
@@ -321,7 +321,7 @@ class TestStorageExtendedMCPGetStats:
 
     def test_get_storage_domain_stats_success(self):
         """测试获取存储域统计信息成功"""
-        from src.mcp_storage_extended import StorageExtendedMCP
+        from ovirt_engine_mcp_server.mcp_storage_extended import StorageExtendedMCP
 
         mock_sd = _create_mock_storage_domain()
 
@@ -349,7 +349,7 @@ class TestStorageExtendedMCPTools:
 
     def test_mcp_tools_defined(self):
         """测试 MCP 工具注册表已定义"""
-        from src.mcp_storage_extended import MCP_TOOLS
+        from ovirt_engine_mcp_server.mcp_storage_extended import MCP_TOOLS
 
         expected_tools = [
             "storage_get",

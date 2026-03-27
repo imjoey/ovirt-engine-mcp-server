@@ -6,6 +6,8 @@ oVirt MCP Server - 数据中心管理模块
 from typing import Dict, List, Any, Optional
 import logging
 
+from .base_mcp import BaseMCP
+from .decorators import require_connection
 from .search_utils import sanitize_search_value as _sanitize_search_value
 
 try:
@@ -16,37 +18,16 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class DataCenterMCP:
+class DataCenterMCP(BaseMCP):
     """数据中心管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
+        super().__init__(ovirt_mcp)
 
-    def _find_datacenter(self, name_or_id: str) -> Optional[Any]:
-        """查找数据中心（按名称或ID）"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        dcs_service = self.ovirt.connection.system_service().data_centers_service()
-
-        # 先尝试按 ID 查找
-        try:
-            dc = dcs_service.data_center_service(name_or_id).get()
-            if dc:
-                return dc
-        except Exception:
-            pass
-
-        # 按名称搜索
-        dcs = dcs_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return dcs[0] if dcs else None
-
+    @require_connection
     def list_datacenters(self) -> List[Dict]:
         """列出所有数据中心"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        dcs_service = self.ovirt.connection.system_service().data_centers_service()
+        dcs_service = self.connection.system_service().data_centers_service()
         dcs = dcs_service.list()
 
         result = []
@@ -65,6 +46,7 @@ class DataCenterMCP:
 
         return result
 
+    @require_connection
     def get_datacenter(self, name_or_id: str) -> Optional[Dict]:
         """获取数据中心详情"""
         dc = self._find_datacenter(name_or_id)
@@ -74,7 +56,7 @@ class DataCenterMCP:
         # 获取关联的集群
         clusters = []
         try:
-            dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+            dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
             clusters_service = dc_service.clusters_service()
             cluster_list = clusters_service.list()
             clusters = [{"id": c.id, "name": c.name} for c in cluster_list]
@@ -112,18 +94,16 @@ class DataCenterMCP:
             "networks": networks,
         }
 
+    @require_connection
     def create_datacenter(self, name: str, storage_type: str = "nfs",
                          description: str = "") -> Dict[str, Any]:
         """创建数据中心"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 验证存储类型
         valid_types = ["nfs", "fc", "iscsi", "localfs", "posixfs", "glusterfs"]
         if storage_type.lower() not in valid_types:
             raise ValueError(f"无效的存储类型: {storage_type}，有效值: {valid_types}")
 
-        dcs_service = self.ovirt.connection.system_service().data_centers_service()
+        dcs_service = self.connection.system_service().data_centers_service()
 
         # 检查是否已存在
         existing = dcs_service.list(search=f"name={_sanitize_search_value(name)}")
@@ -148,17 +128,15 @@ class DataCenterMCP:
         except Exception as e:
             raise RuntimeError(f"创建数据中心失败: {e}")
 
+    @require_connection
     def update_datacenter(self, name_or_id: str, new_name: str = None,
                          description: str = None) -> Dict[str, Any]:
         """更新数据中心"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         dc = self._find_datacenter(name_or_id)
         if not dc:
             raise ValueError(f"数据中心不存在: {name_or_id}")
 
-        dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+        dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
 
         # 获取当前数据中心信息
         current_dc = dc_service.get()
@@ -175,16 +153,14 @@ class DataCenterMCP:
         except Exception as e:
             raise RuntimeError(f"更新数据中心失败: {e}")
 
+    @require_connection
     def delete_datacenter(self, name_or_id: str) -> Dict[str, Any]:
         """删除数据中心"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         dc = self._find_datacenter(name_or_id)
         if not dc:
             raise ValueError(f"数据中心不存在: {name_or_id}")
 
-        dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+        dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
 
         try:
             dc_service.remove()

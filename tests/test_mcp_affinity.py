@@ -36,7 +36,7 @@ class TestAffinityMCPListAffinityGroups:
 
     def test_list_affinity_groups_empty(self):
         """测试空亲和性组列表"""
-        from src.mcp_affinity import AffinityMCP
+        from ovirt_engine_mcp_server.mcp_affinity import AffinityMCP
 
         mock_cluster = _create_mock_cluster()
 
@@ -64,7 +64,7 @@ class TestAffinityMCPListAffinityGroups:
 
     def test_list_affinity_groups_with_data(self):
         """测试有数据的亲和性组列表"""
-        from src.mcp_affinity import AffinityMCP
+        from ovirt_engine_mcp_server.mcp_affinity import AffinityMCP
 
         mock_cluster = _create_mock_cluster()
         mock_group = _create_mock_affinity_group()
@@ -98,7 +98,7 @@ class TestAffinityMCPListAffinityGroups:
 
     def test_list_affinity_groups_cluster_not_found(self):
         """测试集群不存在"""
-        from src.mcp_affinity import AffinityMCP
+        from ovirt_engine_mcp_server.mcp_affinity import AffinityMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -120,7 +120,7 @@ class TestAffinityMCPGetAffinityGroup:
 
     def test_get_affinity_group_by_id(self):
         """测试通过 ID 获取亲和性组"""
-        from src.mcp_affinity import AffinityMCP
+        from ovirt_engine_mcp_server.mcp_affinity import AffinityMCP
 
         mock_cluster = _create_mock_cluster()
         mock_group = _create_mock_affinity_group()
@@ -154,7 +154,7 @@ class TestAffinityMCPGetAffinityGroup:
 
     def test_get_affinity_group_not_found(self):
         """测试亲和性组不存在"""
-        from src.mcp_affinity import AffinityMCP
+        from ovirt_engine_mcp_server.mcp_affinity import AffinityMCP
 
         mock_cluster = _create_mock_cluster()
 
@@ -190,7 +190,7 @@ class TestAffinityMCPCreateAffinityGroup:
 
     def test_create_affinity_group_success(self):
         """测试创建亲和性组成功"""
-        from src.mcp_affinity import AffinityMCP
+        from ovirt_engine_mcp_server.mcp_affinity import AffinityMCP
 
         mock_cluster = _create_mock_cluster()
         mock_group = _create_mock_affinity_group()
@@ -226,7 +226,7 @@ class TestAffinityMCPCreateAffinityGroup:
 
     def test_create_affinity_group_already_exists(self):
         """测试亲和性组已存在"""
-        from src.mcp_affinity import AffinityMCP
+        from ovirt_engine_mcp_server.mcp_affinity import AffinityMCP
 
         mock_cluster = _create_mock_cluster()
         mock_group = _create_mock_affinity_group()
@@ -259,7 +259,7 @@ class TestAffinityMCPUpdateAffinityGroup:
 
     def test_update_affinity_group_success(self):
         """测试更新亲和性组成功"""
-        from src.mcp_affinity import AffinityMCP
+        from ovirt_engine_mcp_server.mcp_affinity import AffinityMCP
 
         mock_cluster = _create_mock_cluster()
         mock_group = _create_mock_affinity_group()
@@ -300,7 +300,7 @@ class TestAffinityMCPDeleteAffinityGroup:
 
     def test_delete_affinity_group_success(self):
         """测试删除亲和性组成功"""
-        from src.mcp_affinity import AffinityMCP
+        from ovirt_engine_mcp_server.mcp_affinity import AffinityMCP
 
         mock_cluster = _create_mock_cluster()
         mock_group = _create_mock_affinity_group()
@@ -336,7 +336,7 @@ class TestAffinityMCPAddVMToAffinityGroup:
 
     def test_add_vm_to_affinity_group_success(self):
         """测试添加 VM 到亲和性组成功"""
-        from src.mcp_affinity import AffinityMCP
+        from ovirt_engine_mcp_server.mcp_affinity import AffinityMCP
 
         mock_cluster = _create_mock_cluster()
         mock_group = _create_mock_affinity_group()
@@ -384,7 +384,7 @@ class TestAffinityMCPRemoveVMFromAffinityGroup:
 
     def test_remove_vm_from_affinity_group_success(self):
         """测试从亲和性组移除 VM 成功"""
-        from src.mcp_affinity import AffinityMCP
+        from ovirt_engine_mcp_server.mcp_affinity import AffinityMCP
 
         mock_cluster = _create_mock_cluster()
         mock_group = _create_mock_affinity_group()
@@ -435,7 +435,7 @@ class TestAffinityMCPTools:
 
     def test_mcp_tools_defined(self):
         """测试 MCP 工具注册表已定义"""
-        from src.mcp_affinity import MCP_TOOLS
+        from ovirt_engine_mcp_server.mcp_affinity import MCP_TOOLS
 
         expected_tools = [
             "affinity_group_list",

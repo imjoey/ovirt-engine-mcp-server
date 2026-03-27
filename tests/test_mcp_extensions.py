@@ -64,7 +64,7 @@ class TestNetworkMCP:
 
     def test_list_networks(self):
         """测试列出网络"""
-        from src.mcp_extensions import NetworkMCP
+        from ovirt_engine_mcp_server.mcp_extensions import NetworkMCP
 
         mock_networks = [_create_mock_network()]
 
@@ -81,7 +81,7 @@ class TestNetworkMCP:
 
     def test_list_vnics(self):
         """测试列出 VM 网卡"""
-        from src.mcp_extensions import NetworkMCP
+        from ovirt_engine_mcp_server.mcp_extensions import NetworkMCP
 
         mock_nic = MagicMock()
         mock_nic.id = "nic-123"
@@ -109,7 +109,7 @@ class TestNetworkMCP:
 
     def test_list_vnics_vm_not_found(self):
         """测试 VM 不存在时列出网卡"""
-        from src.mcp_extensions import NetworkMCP
+        from ovirt_engine_mcp_server.mcp_extensions import NetworkMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt._find_vm.return_value = None
@@ -121,7 +121,7 @@ class TestNetworkMCP:
 
     def test_create_network(self):
         """测试创建网络"""
-        from src.mcp_extensions import NetworkMCP
+        from ovirt_engine_mcp_server.mcp_extensions import NetworkMCP
 
         mock_dc = MagicMock()
         mock_dc.id = "dc-123"
@@ -140,7 +140,7 @@ class TestNetworkMCP:
 
     def test_create_network_datacenter_not_found(self):
         """测试数据中心不存在时创建网络"""
-        from src.mcp_extensions import NetworkMCP
+        from ovirt_engine_mcp_server.mcp_extensions import NetworkMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -153,7 +153,7 @@ class TestNetworkMCP:
 
     def test_update_network(self):
         """测试更新网络"""
-        from src.mcp_extensions import NetworkMCP
+        from ovirt_engine_mcp_server.mcp_extensions import NetworkMCP
 
         mock_network = _create_mock_network()
 
@@ -169,7 +169,7 @@ class TestNetworkMCP:
 
     def test_delete_network(self):
         """测试删除网络"""
-        from src.mcp_extensions import NetworkMCP
+        from ovirt_engine_mcp_server.mcp_extensions import NetworkMCP
 
         mock_network = _create_mock_network()
 
@@ -188,7 +188,7 @@ class TestClusterMCP:
 
     def test_list_clusters(self):
         """测试列出集群"""
-        from src.mcp_extensions import ClusterMCP
+        from ovirt_engine_mcp_server.mcp_extensions import ClusterMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.list_clusters.return_value = [
@@ -203,7 +203,7 @@ class TestClusterMCP:
 
     def test_get_cluster(self):
         """测试获取集群详情"""
-        from src.mcp_extensions import ClusterMCP
+        from ovirt_engine_mcp_server.mcp_extensions import ClusterMCP
 
         mock_cluster = _create_mock_cluster()
 
@@ -220,7 +220,7 @@ class TestClusterMCP:
 
     def test_get_cluster_not_found(self):
         """测试集群不存在"""
-        from src.mcp_extensions import ClusterMCP
+        from ovirt_engine_mcp_server.mcp_extensions import ClusterMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -233,7 +233,7 @@ class TestClusterMCP:
 
     def test_list_cluster_hosts(self):
         """测试列出集群主机"""
-        from src.mcp_extensions import ClusterMCP
+        from ovirt_engine_mcp_server.mcp_extensions import ClusterMCP
 
         mock_hosts = [{"id": "host-123", "name": "host1"}]
 
@@ -248,7 +248,7 @@ class TestClusterMCP:
 
     def test_list_cluster_vms(self):
         """测试列出集群虚拟机"""
-        from src.mcp_extensions import ClusterMCP
+        from ovirt_engine_mcp_server.mcp_extensions import ClusterMCP
 
         mock_vms = [{"id": "vm-123", "name": "vm1"}]
 
@@ -262,7 +262,7 @@ class TestClusterMCP:
 
     def test_get_cluster_cpu_load(self):
         """测试获取集群 CPU 负载"""
-        from src.mcp_extensions import ClusterMCP
+        from ovirt_engine_mcp_server.mcp_extensions import ClusterMCP
 
         mock_hosts = [
             {"id": "host-1", "name": "host1", "cpu_usage": 30},
@@ -281,7 +281,7 @@ class TestClusterMCP:
 
     def test_get_cluster_cpu_load_empty(self):
         """测试空集群的 CPU 负载"""
-        from src.mcp_extensions import ClusterMCP
+        from ovirt_engine_mcp_server.mcp_extensions import ClusterMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.list_hosts.return_value = []
@@ -294,7 +294,7 @@ class TestClusterMCP:
 
     def test_get_cluster_memory_usage(self):
         """测试获取集群内存使用"""
-        from src.mcp_extensions import ClusterMCP
+        from ovirt_engine_mcp_server.mcp_extensions import ClusterMCP
 
         mock_hosts = [
             {"id": "host-1", "name": "host1", "memory_gb": 64, "memory_usage": 50},
@@ -317,7 +317,7 @@ class TestTemplateMCP:
 
     def test_list_templates(self):
         """测试列出模板"""
-        from src.mcp_extensions import TemplateMCP
+        from ovirt_engine_mcp_server.mcp_extensions import TemplateMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.list_templates.return_value = [
@@ -332,7 +332,7 @@ class TestTemplateMCP:
 
     def test_get_template(self):
         """测试获取模板详情"""
-        from src.mcp_extensions import TemplateMCP
+        from ovirt_engine_mcp_server.mcp_extensions import TemplateMCP
 
         mock_tpl = _create_mock_template()
 
@@ -349,7 +349,7 @@ class TestTemplateMCP:
 
     def test_get_template_not_found(self):
         """测试模板不存在"""
-        from src.mcp_extensions import TemplateMCP
+        from ovirt_engine_mcp_server.mcp_extensions import TemplateMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -362,7 +362,7 @@ class TestTemplateMCP:
 
     def test_create_vm_from_template(self):
         """测试从模板创建 VM"""
-        from src.mcp_extensions import TemplateMCP
+        from ovirt_engine_mcp_server.mcp_extensions import TemplateMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.create_vm.return_value = {
@@ -394,7 +394,7 @@ class TestMCPExtensionsTools:
 
     def test_mcp_tools_defined(self):
         """测试 MCP 工具注册表已定义"""
-        from src.mcp_extensions import MCP_TOOLS
+        from ovirt_engine_mcp_server.mcp_extensions import MCP_TOOLS
 
         expected_tools = [
             "vm_list",

@@ -67,7 +67,7 @@ class TestHostExtendedMCPGetHost:
 
     def test_get_host_by_id(self):
         """测试通过 ID 获取主机"""
-        from src.mcp_host_extended import HostExtendedMCP
+        from ovirt_engine_mcp_server.mcp_host_extended import HostExtendedMCP
 
         mock_host = _create_mock_host()
         mock_ovirt = MagicMock()
@@ -94,7 +94,7 @@ class TestHostExtendedMCPGetHost:
 
     def test_get_host_not_found(self):
         """测试主机不存在"""
-        from src.mcp_host_extended import HostExtendedMCP
+        from ovirt_engine_mcp_server.mcp_host_extended import HostExtendedMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -112,7 +112,7 @@ class TestHostExtendedMCPGetHost:
 
     def test_get_host_with_nics(self):
         """测试获取主机包含网卡信息"""
-        from src.mcp_host_extended import HostExtendedMCP
+        from ovirt_engine_mcp_server.mcp_host_extended import HostExtendedMCP
 
         mock_host = _create_mock_host()
         mock_nic = MagicMock()
@@ -151,7 +151,7 @@ class TestHostExtendedMCPAddHost:
 
     def test_add_host_success(self):
         """测试添加主机成功"""
-        from src.mcp_host_extended import HostExtendedMCP
+        from ovirt_engine_mcp_server.mcp_host_extended import HostExtendedMCP
 
         mock_host = _create_mock_host()
         mock_cluster = MagicMock()
@@ -183,7 +183,7 @@ class TestHostExtendedMCPAddHost:
 
     def test_add_host_cluster_not_found(self):
         """测试添加主机时集群不存在"""
-        from src.mcp_host_extended import HostExtendedMCP
+        from ovirt_engine_mcp_server.mcp_host_extended import HostExtendedMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -200,7 +200,7 @@ class TestHostExtendedMCPAddHost:
 
     def test_add_host_already_exists(self):
         """测试添加已存在的主机"""
-        from src.mcp_host_extended import HostExtendedMCP
+        from ovirt_engine_mcp_server.mcp_host_extended import HostExtendedMCP
 
         mock_host = _create_mock_host()
         mock_cluster = MagicMock()
@@ -229,7 +229,7 @@ class TestHostExtendedMCPRemoveHost:
 
     def test_remove_host_success(self):
         """测试移除主机成功"""
-        from src.mcp_host_extended import HostExtendedMCP
+        from ovirt_engine_mcp_server.mcp_host_extended import HostExtendedMCP
 
         mock_host = _create_mock_host()
         mock_host_service = MagicMock()
@@ -255,7 +255,7 @@ class TestHostExtendedMCPRemoveHost:
 
     def test_remove_host_not_found(self):
         """测试移除不存在的主机"""
-        from src.mcp_host_extended import HostExtendedMCP
+        from ovirt_engine_mcp_server.mcp_host_extended import HostExtendedMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -277,7 +277,7 @@ class TestHostExtendedMCPGetHostStats:
 
     def test_get_host_stats_success(self):
         """测试获取主机统计信息成功"""
-        from src.mcp_host_extended import HostExtendedMCP
+        from ovirt_engine_mcp_server.mcp_host_extended import HostExtendedMCP
 
         mock_host = _create_mock_host()
         mock_stats = [
@@ -315,7 +315,7 @@ class TestHostExtendedMCPGetHostDevices:
 
     def test_get_host_devices_success(self):
         """测试获取主机设备列表成功"""
-        from src.mcp_host_extended import HostExtendedMCP
+        from ovirt_engine_mcp_server.mcp_host_extended import HostExtendedMCP
 
         mock_host = _create_mock_host()
         mock_devices = [_create_mock_device(f"dev-{i}", f"device{i}") for i in range(3)]
@@ -341,7 +341,7 @@ class TestHostExtendedMCPGetHostDevices:
 
     def test_get_host_devices_not_found(self):
         """测试主机不存在时获取设备"""
-        from src.mcp_host_extended import HostExtendedMCP
+        from ovirt_engine_mcp_server.mcp_host_extended import HostExtendedMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -363,7 +363,7 @@ class TestHostExtendedMCPTools:
 
     def test_mcp_tools_defined(self):
         """测试 MCP 工具注册表已定义"""
-        from src.mcp_host_extended import MCP_TOOLS
+        from ovirt_engine_mcp_server.mcp_host_extended import MCP_TOOLS
 
         expected_tools = [
             "host_get",

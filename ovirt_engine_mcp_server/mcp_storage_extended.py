@@ -6,6 +6,8 @@ oVirt MCP Server - 存储扩展模块
 from typing import Dict, List, Any, Optional
 import logging
 
+from .base_mcp import BaseMCP
+from .decorators import require_connection
 from .search_utils import sanitize_search_value as _sanitize_search_value
 
 try:
@@ -16,45 +18,13 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class StorageExtendedMCP:
+class StorageExtendedMCP(BaseMCP):
     """存储扩展管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
+        super().__init__(ovirt_mcp)
 
-    def _find_storage_domain(self, name_or_id: str) -> Optional[Any]:
-        """查找存储域（按名称或ID）"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        sds_service = self.ovirt.connection.system_service().storage_domains_service()
-
-        # 先尝试按 ID 查找
-        try:
-            sd = sds_service.storage_domain_service(name_or_id).get()
-            if sd:
-                return sd
-        except Exception:
-            pass
-
-        # 按名称搜索
-        sds = sds_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return sds[0] if sds else None
-
-    def _find_datacenter(self, name_or_id: str) -> Optional[Any]:
-        """查找数据中心"""
-        dcs_service = self.ovirt.connection.system_service().data_centers_service()
-
-        try:
-            dc = dcs_service.data_center_service(name_or_id).get()
-            if dc:
-                return dc
-        except Exception:
-            pass
-
-        dcs = dcs_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return dcs[0] if dcs else None
-
+    @require_connection
     def get_storage_domain(self, name_or_id: str) -> Optional[Dict]:
         """获取存储域详情"""
         sd = self._find_storage_domain(name_or_id)
@@ -64,7 +34,7 @@ class StorageExtendedMCP:
         # 获取存储域的文件列表（如果支持）
         files = []
         try:
-            sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+            sd_service = self.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
             files_service = sd_service.files_service()
             file_list = files_service.list()
             files = [
@@ -107,14 +77,12 @@ class StorageExtendedMCP:
             "files": files,
         }
 
+    @require_connection
     def create_storage_domain(self, name: str, storage_type: str, host: str,
                              path: str, datacenter: str = None,
                              description: str = "",
                              domain_type: str = "data") -> Dict[str, Any]:
         """创建存储域"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 验证存储类型
         valid_storage_types = ["nfs", "fc", "iscsi", "localfs", "posixfs", "glusterfs"]
         if storage_type.lower() not in valid_storage_types:
@@ -126,13 +94,13 @@ class StorageExtendedMCP:
             raise ValueError(f"无效的域类型: {domain_type}，有效值: {valid_domain_types}")
 
         # 查找主机
-        hosts = self.ovirt.connection.system_service().hosts_service().list(
+        hosts = self.connection.system_service().hosts_service().list(
             search=f"name={_sanitize_search_value(host)}"
         )
         if not hosts:
             raise ValueError(f"主机不存在: {host}")
 
-        sds_service = self.ovirt.connection.system_service().storage_domains_service()
+        sds_service = self.connection.system_service().storage_domains_service()
 
         # 检查存储域是否已存在
         existing = sds_service.list(search=f"name={_sanitize_search_value(name)}")
@@ -178,16 +146,14 @@ class StorageExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"创建存储域失败: {e}")
 
+    @require_connection
     def delete_storage_domain(self, name_or_id: str, force: bool = False) -> Dict[str, Any]:
         """删除存储域"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         sd = self._find_storage_domain(name_or_id)
         if not sd:
             raise ValueError(f"存储域不存在: {name_or_id}")
 
-        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+        sd_service = self.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
 
         try:
             sd_service.remove(force=force)
@@ -195,11 +161,9 @@ class StorageExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"删除存储域失败: {e}")
 
+    @require_connection
     def detach_storage_domain(self, name_or_id: str, datacenter: str = None) -> Dict[str, Any]:
         """从数据中心分离存储域"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         sd = self._find_storage_domain(name_or_id)
         if not sd:
             raise ValueError(f"存储域不存在: {name_or_id}")
@@ -217,7 +181,7 @@ class StorageExtendedMCP:
 
         try:
             # 通过数据中心的存储域服务分离
-            dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+            dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
             sd_service = dc_service.storage_domains_service().storage_domain_service(sd.id)
             sd_service.remove()
 
@@ -225,11 +189,9 @@ class StorageExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"分离存储域失败: {e}")
 
+    @require_connection
     def attach_storage_domain(self, name_or_id: str, datacenter: str) -> Dict[str, Any]:
         """将存储域附加到数据中心"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         sd = self._find_storage_domain(name_or_id)
         if not sd:
             raise ValueError(f"存储域不存在: {name_or_id}")
@@ -239,7 +201,7 @@ class StorageExtendedMCP:
             raise ValueError(f"数据中心不存在: {datacenter}")
 
         try:
-            dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+            dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
             sd_service = dc_service.storage_domains_service()
 
             sd_service.add(
@@ -250,6 +212,7 @@ class StorageExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"附加存储域失败: {e}")
 
+    @require_connection
     def get_storage_domain_stats(self, name_or_id: str) -> Dict[str, Any]:
         """获取存储域统计信息"""
         sd = self._find_storage_domain(name_or_id)
@@ -272,6 +235,7 @@ class StorageExtendedMCP:
             "master": sd.master if hasattr(sd, 'master') else False,
         }
 
+    @require_connection
     def refresh_storage_domain(self, name_or_id: str) -> Dict[str, Any]:
         """刷新存储域
 
@@ -281,14 +245,11 @@ class StorageExtendedMCP:
         Returns:
             刷新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         sd = self._find_storage_domain(name_or_id)
         if not sd:
             raise ValueError(f"存储域不存在: {name_or_id}")
 
-        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+        sd_service = self.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
 
         try:
             sd_service.refresh()
@@ -296,6 +257,7 @@ class StorageExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"刷新存储域失败: {e}")
 
+    @require_connection
     def update_storage_domain(self, name_or_id: str, new_name: str = None,
                              description: str = None,
                              warning_low_space: int = None,
@@ -312,14 +274,11 @@ class StorageExtendedMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         sd = self._find_storage_domain(name_or_id)
         if not sd:
             raise ValueError(f"存储域不存在: {name_or_id}")
 
-        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+        sd_service = self.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
 
         if new_name:
             sd.name = new_name
@@ -336,6 +295,7 @@ class StorageExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"更新存储域失败: {e}")
 
+    @require_connection
     def list_storage_files(self, name_or_id: str) -> List[Dict]:
         """列出存储域的文件
 
@@ -345,14 +305,11 @@ class StorageExtendedMCP:
         Returns:
             文件列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         sd = self._find_storage_domain(name_or_id)
         if not sd:
             raise ValueError(f"存储域不存在: {name_or_id}")
 
-        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+        sd_service = self.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
         files_service = sd_service.files_service()
 
         try:
@@ -370,6 +327,7 @@ class StorageExtendedMCP:
             for f in files
         ]
 
+    @require_connection
     def list_storage_connections(self, name_or_id: str = None) -> List[Dict]:
         """列出存储连接
 
@@ -379,10 +337,7 @@ class StorageExtendedMCP:
         Returns:
             存储连接列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        connections_service = self.ovirt.connection.system_service().storage_connections_service()
+        connections_service = self.connection.system_service().storage_connections_service()
 
         try:
             connections = connections_service.list()
@@ -403,6 +358,7 @@ class StorageExtendedMCP:
             for c in connections
         ]
 
+    @require_connection
     def list_available_disks(self, name_or_id: str) -> List[Dict]:
         """列出存储域上的可用磁盘
 
@@ -412,15 +368,12 @@ class StorageExtendedMCP:
         Returns:
             可用磁盘列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         sd = self._find_storage_domain(name_or_id)
         if not sd:
             raise ValueError(f"存储域不存在: {name_or_id}")
 
-        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
-        disks_service = sd_service.disk_service()
+        sd_service = self.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+        disks_service = sd_service.disks_service()
 
         try:
             disks = disks_service.list()
@@ -441,6 +394,7 @@ class StorageExtendedMCP:
             for d in disks
         ]
 
+    @require_connection
     def list_export_vms(self, name_or_id: str) -> List[Dict]:
         """列出导出域上的 VM
 
@@ -450,9 +404,6 @@ class StorageExtendedMCP:
         Returns:
             VM 列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         sd = self._find_storage_domain(name_or_id)
         if not sd:
             raise ValueError(f"存储域不存在: {name_or_id}")
@@ -461,7 +412,7 @@ class StorageExtendedMCP:
         if sd.type and sd.type.value != "export":
             raise ValueError("此存储域不是导出域")
 
-        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+        sd_service = self.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
         vms_service = sd_service.vms_service()
 
         try:
@@ -482,6 +433,7 @@ class StorageExtendedMCP:
             for vm in vms
         ]
 
+    @require_connection
     def import_vm_from_export(self, name_or_id: str, vm_name: str,
                              cluster: str, storage_domain: str = None,
                              clone: bool = False) -> Dict[str, Any]:
@@ -497,21 +449,18 @@ class StorageExtendedMCP:
         Returns:
             导入结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         sd = self._find_storage_domain(name_or_id)
         if not sd:
             raise ValueError(f"存储域不存在: {name_or_id}")
 
         # 查找集群
-        clusters = self.ovirt.connection.system_service().clusters_service().list(
+        clusters = self.connection.system_service().clusters_service().list(
             search=f"name={_sanitize_search_value(cluster)}"
         )
         if not clusters:
             raise ValueError(f"集群不存在: {cluster}")
 
-        sd_service = self.ovirt.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
+        sd_service = self.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
         vms_service = sd_service.vms_service()
 
         # 查找要导入的 VM
@@ -549,6 +498,7 @@ class StorageExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"导入 VM 失败: {e}")
 
+    @require_connection
     def list_disk_snapshots(self, disk_name_or_id: str) -> List[Dict]:
         """列出磁盘快照
 
@@ -558,11 +508,8 @@ class StorageExtendedMCP:
         Returns:
             磁盘快照列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 查找磁盘
-        disks_service = self.ovirt.connection.system_service().disks_service()
+        disks_service = self.connection.system_service().disks_service()
 
         disk_id = None
         try:
@@ -594,16 +541,14 @@ class StorageExtendedMCP:
             for s in snapshots
         ]
 
+    @require_connection
     def list_iscsi_bonds(self) -> List[Dict]:
         """列出 iSCSI Bond
 
         Returns:
             iSCSI Bond 列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        bonds_service = self.ovirt.connection.system_service().iscsi_bonds_service()
+        bonds_service = self.connection.system_service().iscsi_bonds_service()
 
         try:
             bonds = bonds_service.list()

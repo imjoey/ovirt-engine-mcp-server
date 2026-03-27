@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ovirt-mcp-server"
+name = "ovirt-engine-mcp-server"
 version = "0.1.0"
 description = "Model Context Protocol (MCP) server for oVirt/RHV virtualization management"
 readme = "README.md"
@@ -43,16 +43,16 @@ dev = [
 ]
 
 [project.scripts]
-ovirt-mcp = "src.server:main"
+ovirt-engine-mcp = "ovirt_engine_mcp_server.server:main"
 
 [project.urls]
-Homepage = "https://github.com/imjoey/ovirt-mcp-server"
-Repository = "https://github.com/imjoey/ovirt-mcp-server"
-Issues = "https://github.com/imjoey/ovirt-mcp-server/issues"
+Homepage = "https://github.com/imjoey/ovirt-engine-mcp-server"
+Repository = "https://github.com/imjoey/ovirt-engine-mcp-server"
+Issues = "https://github.com/imjoey/ovirt-engine-mcp-server/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src*"]
+include = ["ovirt_engine_mcp_server*"]
 
 [tool.setuptools.package-dir]
 "" = "."

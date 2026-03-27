@@ -6,6 +6,8 @@ oVirt MCP Server - 亲和性组管理模块
 from typing import Dict, List, Any, Optional
 import logging
 
+from .base_mcp import BaseMCP
+from .decorators import require_connection
 from .search_utils import sanitize_search_value as _sanitize_search_value
 
 try:
@@ -16,40 +18,27 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class AffinityMCP:
+class AffinityMCP(BaseMCP):
     """亲和性组管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
+        super().__init__(ovirt_mcp)
 
-    def _find_cluster(self, name_or_id: str) -> Optional[Any]:
-        """查找集群"""
-        clusters_service = self.ovirt.connection.system_service().clusters_service()
+    def _find_affinity_label(self, name_or_id: str) -> Optional[Any]:
+        """查找亲和性标签"""
+        labels_service = self.connection.system_service().affinity_labels_service()
 
         try:
-            cluster = clusters_service.cluster_service(name_or_id).get()
-            if cluster:
-                return cluster
+            label = labels_service.affinity_label_service(name_or_id).get()
+            if label:
+                return label
         except Exception:
             pass
 
-        clusters = clusters_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return clusters[0] if clusters else None
+        labels = labels_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
+        return labels[0] if labels else None
 
-    def _find_vm(self, name_or_id: str) -> Optional[Any]:
-        """查找虚拟机"""
-        vms_service = self.ovirt.connection.system_service().vms_service()
-
-        try:
-            vm = vms_service.vm_service(name_or_id).get()
-            if vm:
-                return vm
-        except Exception:
-            pass
-
-        vms = vms_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return vms[0] if vms else None
-
+    @require_connection
     def list_affinity_groups(self, cluster: str) -> List[Dict]:
         """列出集群的亲和性组
 
@@ -59,14 +48,11 @@ class AffinityMCP:
         Returns:
             亲和性组列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         cluster_obj = self._find_cluster(cluster)
         if not cluster_obj:
             raise ValueError(f"集群不存在: {cluster}")
 
-        cluster_service = self.ovirt.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
+        cluster_service = self.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
         affinity_groups_service = cluster_service.affinity_groups_service()
 
         try:
@@ -95,16 +81,14 @@ class AffinityMCP:
 
         return result
 
+    @require_connection
     def get_affinity_group(self, cluster: str, name_or_id: str) -> Optional[Dict]:
         """获取亲和性组详情"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         cluster_obj = self._find_cluster(cluster)
         if not cluster_obj:
             raise ValueError(f"集群不存在: {cluster}")
 
-        cluster_service = self.ovirt.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
+        cluster_service = self.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
         affinity_groups_service = cluster_service.affinity_groups_service()
 
         # 查找亲和性组
@@ -143,6 +127,7 @@ class AffinityMCP:
             "description": "",  # affinity group 没有 description 字段
         }
 
+    @require_connection
     def create_affinity_group(self, name: str, cluster: str,
                              positive: bool = True,
                              enforcing: bool = False,
@@ -159,14 +144,11 @@ class AffinityMCP:
         Returns:
             创建结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         cluster_obj = self._find_cluster(cluster)
         if not cluster_obj:
             raise ValueError(f"集群不存在: {cluster}")
 
-        cluster_service = self.ovirt.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
+        cluster_service = self.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
         affinity_groups_service = cluster_service.affinity_groups_service()
 
         # 检查是否已存在
@@ -203,19 +185,17 @@ class AffinityMCP:
         except Exception as e:
             raise RuntimeError(f"创建亲和性组失败: {e}")
 
+    @require_connection
     def update_affinity_group(self, cluster: str, name_or_id: str,
                              new_name: str = None,
                              positive: bool = None,
                              enforcing: bool = None) -> Dict[str, Any]:
         """更新亲和性组"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         cluster_obj = self._find_cluster(cluster)
         if not cluster_obj:
             raise ValueError(f"集群不存在: {cluster}")
 
-        cluster_service = self.ovirt.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
+        cluster_service = self.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
         affinity_groups_service = cluster_service.affinity_groups_service()
 
         # 查找亲和性组
@@ -248,16 +228,14 @@ class AffinityMCP:
         except Exception as e:
             raise RuntimeError(f"更新亲和性组失败: {e}")
 
+    @require_connection
     def delete_affinity_group(self, cluster: str, name_or_id: str) -> Dict[str, Any]:
         """删除亲和性组"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         cluster_obj = self._find_cluster(cluster)
         if not cluster_obj:
             raise ValueError(f"集群不存在: {cluster}")
 
-        cluster_service = self.ovirt.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
+        cluster_service = self.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
         affinity_groups_service = cluster_service.affinity_groups_service()
 
         # 查找亲和性组
@@ -283,12 +261,10 @@ class AffinityMCP:
         except Exception as e:
             raise RuntimeError(f"删除亲和性组失败: {e}")
 
+    @require_connection
     def add_vm_to_affinity_group(self, cluster: str, affinity_group: str,
                                  vm: str) -> Dict[str, Any]:
         """将 VM 添加到亲和性组"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         cluster_obj = self._find_cluster(cluster)
         if not cluster_obj:
             raise ValueError(f"集群不存在: {cluster}")
@@ -297,7 +273,7 @@ class AffinityMCP:
         if not vm_obj:
             raise ValueError(f"VM 不存在: {vm}")
 
-        cluster_service = self.ovirt.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
+        cluster_service = self.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
         affinity_groups_service = cluster_service.affinity_groups_service()
 
         # 查找亲和性组
@@ -324,12 +300,10 @@ class AffinityMCP:
         except Exception as e:
             raise RuntimeError(f"添加 VM 到亲和性组失败: {e}")
 
+    @require_connection
     def remove_vm_from_affinity_group(self, cluster: str, affinity_group: str,
                                       vm: str) -> Dict[str, Any]:
         """从亲和性组移除 VM"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         cluster_obj = self._find_cluster(cluster)
         if not cluster_obj:
             raise ValueError(f"集群不存在: {cluster}")
@@ -338,7 +312,7 @@ class AffinityMCP:
         if not vm_obj:
             raise ValueError(f"VM 不存在: {vm}")
 
-        cluster_service = self.ovirt.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
+        cluster_service = self.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
         affinity_groups_service = cluster_service.affinity_groups_service()
 
         # 查找亲和性组
@@ -368,30 +342,14 @@ class AffinityMCP:
 
     # ── Affinity Label 管理 ──────────────────────────────────────────────────
 
-    def _find_affinity_label(self, name_or_id: str) -> Optional[Any]:
-        """查找亲和性标签"""
-        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
-
-        try:
-            label = labels_service.affinity_label_service(name_or_id).get()
-            if label:
-                return label
-        except Exception:
-            pass
-
-        labels = labels_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return labels[0] if labels else None
-
+    @require_connection
     def list_affinity_labels(self) -> List[Dict]:
         """列出亲和性标签
 
         Returns:
             亲和性标签列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
+        labels_service = self.connection.system_service().affinity_labels_service()
 
         try:
             labels = labels_service.list()
@@ -410,6 +368,7 @@ class AffinityMCP:
             for l in labels
         ]
 
+    @require_connection
     def get_affinity_label(self, name_or_id: str) -> Optional[Dict]:
         """获取亲和性标签详情
 
@@ -419,9 +378,6 @@ class AffinityMCP:
         Returns:
             标签详情
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         label = self._find_affinity_label(name_or_id)
         if not label:
             return None
@@ -452,6 +408,7 @@ class AffinityMCP:
             "host_count": len(hosts),
         }
 
+    @require_connection
     def create_affinity_label(self, name: str) -> Dict[str, Any]:
         """创建亲和性标签
 
@@ -461,10 +418,7 @@ class AffinityMCP:
         Returns:
             创建结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
+        labels_service = self.connection.system_service().affinity_labels_service()
 
         # 检查是否已存在
         existing = labels_service.list(search=f"name={_sanitize_search_value(name)}")
@@ -484,6 +438,7 @@ class AffinityMCP:
         except Exception as e:
             raise RuntimeError(f"创建亲和性标签失败: {e}")
 
+    @require_connection
     def delete_affinity_label(self, name_or_id: str) -> Dict[str, Any]:
         """删除亲和性标签
 
@@ -493,14 +448,11 @@ class AffinityMCP:
         Returns:
             删除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         label = self._find_affinity_label(name_or_id)
         if not label:
             raise ValueError(f"亲和性标签不存在: {name_or_id}")
 
-        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
+        labels_service = self.connection.system_service().affinity_labels_service()
         label_service = labels_service.affinity_label_service(label.id)
 
         try:
@@ -509,6 +461,7 @@ class AffinityMCP:
         except Exception as e:
             raise RuntimeError(f"删除亲和性标签失败: {e}")
 
+    @require_connection
     def assign_affinity_label(self, label: str, resource_type: str,
                              resource: str) -> Dict[str, Any]:
         """为资源分配亲和性标签
@@ -521,9 +474,6 @@ class AffinityMCP:
         Returns:
             分配结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         if resource_type.lower() not in ["vm", "host"]:
             raise ValueError("resource_type 必须是 'vm' 或 'host'")
 
@@ -531,7 +481,7 @@ class AffinityMCP:
         if not label_obj:
             raise ValueError(f"亲和性标签不存在: {label}")
 
-        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
+        labels_service = self.connection.system_service().affinity_labels_service()
         label_service = labels_service.affinity_label_service(label_obj.id)
 
         try:
@@ -555,6 +505,7 @@ class AffinityMCP:
         except Exception as e:
             raise RuntimeError(f"分配亲和性标签失败: {e}")
 
+    @require_connection
     def unassign_affinity_label(self, label: str, resource_type: str,
                                resource: str) -> Dict[str, Any]:
         """移除资源的亲和性标签
@@ -567,9 +518,6 @@ class AffinityMCP:
         Returns:
             移除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         if resource_type.lower() not in ["vm", "host"]:
             raise ValueError("resource_type 必须是 'vm' 或 'host'")
 
@@ -577,7 +525,7 @@ class AffinityMCP:
         if not label_obj:
             raise ValueError(f"亲和性标签不存在: {label}")
 
-        labels_service = self.ovirt.connection.system_service().affinity_labels_service()
+        labels_service = self.connection.system_service().affinity_labels_service()
         label_service = labels_service.affinity_label_service(label_obj.id)
 
         try:
@@ -602,20 +550,6 @@ class AffinityMCP:
             }
         except Exception as e:
             raise RuntimeError(f"移除亲和性标签失败: {e}")
-
-    def _find_host(self, name_or_id: str) -> Optional[Any]:
-        """查找主机"""
-        hosts_service = self.ovirt.connection.system_service().hosts_service()
-
-        try:
-            host = hosts_service.host_service(name_or_id).get()
-            if host:
-                return host
-        except Exception:
-            pass
-
-        hosts = hosts_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return hosts[0] if hosts else None
 
 
 # MCP 工具注册表

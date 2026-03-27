@@ -6,6 +6,8 @@ oVirt MCP Server - VM 扩展模块
 from typing import Dict, List, Any, Optional
 import logging
 
+from .base_mcp import BaseMCP
+from .decorators import require_connection
 from .search_utils import sanitize_search_value as _sanitize_search_value
 
 try:
@@ -16,45 +18,15 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class VmExtendedMCP:
+class VmExtendedMCP(BaseMCP):
     """VM 扩展管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
+        super().__init__(ovirt_mcp)
 
-    def _find_vm(self, name_or_id: str) -> Optional[Any]:
-        """查找虚拟机（按名称或ID）"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
+    # ── VM 迁移 ──────────────────────────────────────────────────────────────
 
-        vms_service = self.ovirt.connection.system_service().vms_service()
-
-        try:
-            vm = vms_service.vm_service(name_or_id).get()
-            if vm:
-                return vm
-        except Exception:
-            pass
-
-        vms = vms_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return vms[0] if vms else None
-
-    def _find_host(self, name_or_id: str) -> Optional[Any]:
-        """查找主机"""
-        hosts_service = self.ovirt.connection.system_service().hosts_service()
-
-        try:
-            host = hosts_service.host_service(name_or_id).get()
-            if host:
-                return host
-        except Exception:
-            pass
-
-        hosts = hosts_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return hosts[0] if hosts else None
-
-    # ── VM 迁移 ──────────────────────────────────────────────────────────
-
+    @require_connection
     def migrate_vm(self, name_or_id: str, target_host: str = None) -> Dict[str, Any]:
         """迁移虚拟机到另一台主机
 
@@ -65,14 +37,11 @@ class VmExtendedMCP:
         Returns:
             迁移结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
 
         # 构建迁移参数
         host_ref = None
@@ -93,8 +62,9 @@ class VmExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"迁移 VM 失败: {e}")
 
-    # ── VM 控制台 ────────────────────────────────────────────────────────
+    # ── VM 控制台 ────────────────────────────────────────────────────────────
 
+    @require_connection
     def get_vm_console(self, name_or_id: str, console_type: str = "spice") -> Dict[str, Any]:
         """获取虚拟机控制台访问信息
 
@@ -105,14 +75,11 @@ class VmExtendedMCP:
         Returns:
             控制台连接信息
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
 
         # 获取图形控制台
         consoles = []
@@ -152,8 +119,9 @@ class VmExtendedMCP:
             "console_count": len(consoles),
         }
 
-    # ── CDROM 管理 ────────────────────────────────────────────────────────
+    # ── CDROM 管理 ────────────────────────────────────────────────────────────
 
+    @require_connection
     def list_vm_cdroms(self, name_or_id: str) -> List[Dict]:
         """列出 VM 的 CDROM 设备
 
@@ -163,14 +131,11 @@ class VmExtendedMCP:
         Returns:
             CDROM 列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         cdroms_service = vm_service.cdroms_service()
 
         try:
@@ -189,6 +154,7 @@ class VmExtendedMCP:
 
         return result
 
+    @require_connection
     def update_vm_cdrom(self, name_or_id: str, cdrom_id: str,
                        iso_file: str = None, eject: bool = False) -> Dict[str, Any]:
         """更新 VM 的 CDROM（挂载/弹出 ISO）
@@ -202,14 +168,11 @@ class VmExtendedMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         cdroms_service = vm_service.cdroms_service()
         cdrom_service = cdroms_service.cdrom_service(cdrom_id)
 
@@ -234,8 +197,9 @@ class VmExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"更新 CDROM 失败: {e}")
 
-    # ── 主机设备管理 ──────────────────────────────────────────────────────
+    # ── 主机设备管理 ──────────────────────────────────────────────────────────
 
+    @require_connection
     def list_vm_host_devices(self, name_or_id: str) -> List[Dict]:
         """列出 VM 的主机设备
 
@@ -245,14 +209,11 @@ class VmExtendedMCP:
         Returns:
             主机设备列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         host_devices_service = vm_service.host_devices_service()
 
         try:
@@ -272,6 +233,7 @@ class VmExtendedMCP:
             for d in devices
         ]
 
+    @require_connection
     def attach_vm_host_device(self, name_or_id: str, device_name: str) -> Dict[str, Any]:
         """将主机设备附加到 VM
 
@@ -282,9 +244,6 @@ class VmExtendedMCP:
         Returns:
             附加结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
@@ -293,7 +252,7 @@ class VmExtendedMCP:
         if not vm.host:
             raise ValueError("VM 未运行在主机上，无法附加设备")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(vm.host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(vm.host.id)
         devices_service = host_service.devices_service()
 
         # 查找设备
@@ -303,7 +262,7 @@ class VmExtendedMCP:
 
         device = devices[0]
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         host_devices_service = vm_service.host_devices_service()
 
         try:
@@ -319,6 +278,7 @@ class VmExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"附加设备失败: {e}")
 
+    @require_connection
     def detach_vm_host_device(self, name_or_id: str, device_name: str) -> Dict[str, Any]:
         """从 VM 分离主机设备
 
@@ -329,14 +289,11 @@ class VmExtendedMCP:
         Returns:
             分离结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         host_devices_service = vm_service.host_devices_service()
 
         # 查找设备
@@ -362,8 +319,9 @@ class VmExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"分离设备失败: {e}")
 
-    # ── 介导设备管理 ──────────────────────────────────────────────────────
+    # ── 介导设备管理 ──────────────────────────────────────────────────────────
 
+    @require_connection
     def list_vm_mediated_devices(self, name_or_id: str) -> List[Dict]:
         """列出 VM 的介导设备（vGPU 等）
 
@@ -373,14 +331,11 @@ class VmExtendedMCP:
         Returns:
             介导设备列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         mediated_devices_service = vm_service.mediated_devices_service()
 
         try:
@@ -399,8 +354,9 @@ class VmExtendedMCP:
             for d in devices
         ]
 
-    # ── NUMA 管理 ──────────────────────────────────────────────────────────
+    # ── NUMA 管理 ────────────────────────────────────────────────────────────
 
+    @require_connection
     def list_vm_numa_nodes(self, name_or_id: str) -> List[Dict]:
         """列出 VM 的 NUMA 节点
 
@@ -410,14 +366,11 @@ class VmExtendedMCP:
         Returns:
             NUMA 节点列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         numa_service = vm_service.numa_nodes_service()
 
         try:
@@ -441,8 +394,9 @@ class VmExtendedMCP:
 
         return result
 
-    # ── Watchdog 管理 ──────────────────────────────────────────────────────
+    # ── Watchdog 管理 ──────────────────────────────────────────────────────────
 
+    @require_connection
     def list_vm_watchdogs(self, name_or_id: str) -> List[Dict]:
         """列出 VM 的 Watchdog 设备
 
@@ -452,14 +406,11 @@ class VmExtendedMCP:
         Returns:
             Watchdog 列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         watchdogs_service = vm_service.watchdogs_service()
 
         try:
@@ -477,6 +428,7 @@ class VmExtendedMCP:
             for w in watchdogs
         ]
 
+    @require_connection
     def update_vm_watchdog(self, name_or_id: str, watchdog_id: str,
                           action: str = None) -> Dict[str, Any]:
         """更新 VM 的 Watchdog 配置
@@ -489,14 +441,11 @@ class VmExtendedMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         watchdogs_service = vm_service.watchdogs_service()
         watchdog_service = watchdogs_service.watchdog_service(watchdog_id)
 
@@ -520,8 +469,9 @@ class VmExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"更新 Watchdog 失败: {e}")
 
-    # ── VM 固定到主机 ──────────────────────────────────────────────────────
+    # ── VM 固定到主机 ──────────────────────────────────────────────────────────
 
+    @require_connection
     def pin_vm_to_host(self, name_or_id: str, host: str,
                       pin_policy: str = "user") -> Dict[str, Any]:
         """将 VM 固定到指定主机
@@ -534,9 +484,6 @@ class VmExtendedMCP:
         Returns:
             固定结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
@@ -545,7 +492,7 @@ class VmExtendedMCP:
         if not host_obj:
             raise ValueError(f"主机不存在: {host}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
 
         # 设置固定主机
         vm_update = sdk.types.Vm(
@@ -570,8 +517,9 @@ class VmExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"固定 VM 失败: {e}")
 
-    # ── VM 会话管理 ────────────────────────────────────────────────────────
+    # ── VM 会话管理 ────────────────────────────────────────────────────────────
 
+    @require_connection
     def list_vm_sessions(self, name_or_id: str) -> List[Dict]:
         """列出 VM 的活跃会话
 
@@ -581,14 +529,11 @@ class VmExtendedMCP:
         Returns:
             会话列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         sessions_service = vm_service.sessions_service()
 
         try:
@@ -608,8 +553,9 @@ class VmExtendedMCP:
             for s in sessions
         ]
 
-    # ── VM 池管理 ──────────────────────────────────────────────────────────
+    # ── VM 池管理 ────────────────────────────────────────────────────────────
 
+    @require_connection
     def list_vm_pools(self, cluster: str = None) -> List[Dict]:
         """列出虚拟机池
 
@@ -619,10 +565,7 @@ class VmExtendedMCP:
         Returns:
             VM 池列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        pools_service = self.ovirt.connection.system_service().vm_pools_service()
+        pools_service = self.connection.system_service().vm_pools_service()
 
         search = None
         if cluster:
@@ -649,6 +592,7 @@ class VmExtendedMCP:
             for p in pools
         ]
 
+    @require_connection
     def get_vm_pool(self, name_or_id: str) -> Optional[Dict]:
         """获取虚拟机池详情
 
@@ -658,10 +602,7 @@ class VmExtendedMCP:
         Returns:
             VM 池详情
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        pools_service = self.ovirt.connection.system_service().vm_pools_service()
+        pools_service = self.connection.system_service().vm_pools_service()
 
         # 尝试按 ID 获取
         try:
@@ -698,6 +639,7 @@ class VmExtendedMCP:
             "rng_device": str(pool.rng_device.source.value) if hasattr(pool, 'rng_device') and pool.rng_device else "",
         }
 
+    @require_connection
     def create_vm_pool(self, name: str, template: str, cluster: str,
                       size: int = 5, description: str = "",
                       max_user_vms: int = 1, prestarted_vms: int = 0,
@@ -717,24 +659,21 @@ class VmExtendedMCP:
         Returns:
             创建结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 查找模板
-        templates = self.ovirt.connection.system_service().templates_service().list(
+        templates = self.connection.system_service().templates_service().list(
             search=f"name={_sanitize_search_value(template)}"
         )
         if not templates:
             raise ValueError(f"模板不存在: {template}")
 
         # 查找集群
-        clusters = self.ovirt.connection.system_service().clusters_service().list(
+        clusters = self.connection.system_service().clusters_service().list(
             search=f"name={_sanitize_search_value(cluster)}"
         )
         if not clusters:
             raise ValueError(f"集群不存在: {cluster}")
 
-        pools_service = self.ovirt.connection.system_service().vm_pools_service()
+        pools_service = self.connection.system_service().vm_pools_service()
 
         try:
             pool = pools_service.add(
@@ -759,6 +698,7 @@ class VmExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"创建 VM 池失败: {e}")
 
+    @require_connection
     def delete_vm_pool(self, name_or_id: str, force: bool = False) -> Dict[str, Any]:
         """删除虚拟机池
 
@@ -769,10 +709,7 @@ class VmExtendedMCP:
         Returns:
             删除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        pools_service = self.ovirt.connection.system_service().vm_pools_service()
+        pools_service = self.connection.system_service().vm_pools_service()
 
         # 查找池
         pool_id = None
@@ -797,6 +734,7 @@ class VmExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"删除 VM 池失败: {e}")
 
+    @require_connection
     def update_vm_pool(self, name_or_id: str, new_name: str = None,
                       size: int = None, description: str = None,
                       prestarted_vms: int = None) -> Dict[str, Any]:
@@ -812,10 +750,7 @@ class VmExtendedMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        pools_service = self.ovirt.connection.system_service().vm_pools_service()
+        pools_service = self.connection.system_service().vm_pools_service()
 
         # 查找池
         pool_id = None
@@ -847,8 +782,9 @@ class VmExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"更新 VM 池失败: {e}")
 
-    # ── VM 检查点管理 ──────────────────────────────────────────────────────
+    # ── VM 检查点管理 ──────────────────────────────────────────────────────────
 
+    @require_connection
     def list_vm_checkpoints(self, name_or_id: str) -> List[Dict]:
         """列出 VM 的检查点
 
@@ -858,14 +794,11 @@ class VmExtendedMCP:
         Returns:
             检查点列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         checkpoints_service = vm_service.checkpoints_service()
 
         try:
@@ -884,6 +817,7 @@ class VmExtendedMCP:
             for c in checkpoints
         ]
 
+    @require_connection
     def create_vm_checkpoint(self, name_or_id: str, description: str = "") -> Dict[str, Any]:
         """创建 VM 检查点
 
@@ -894,14 +828,11 @@ class VmExtendedMCP:
         Returns:
             创建结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         checkpoints_service = vm_service.checkpoints_service()
 
         try:
@@ -920,6 +851,7 @@ class VmExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"创建检查点失败: {e}")
 
+    @require_connection
     def restore_vm_checkpoint(self, name_or_id: str, checkpoint_id: str) -> Dict[str, Any]:
         """恢复 VM 到检查点
 
@@ -930,14 +862,11 @@ class VmExtendedMCP:
         Returns:
             恢复结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         checkpoints_service = vm_service.checkpoints_service()
         checkpoint_service = checkpoints_service.checkpoint_service(checkpoint_id)
 
@@ -952,6 +881,7 @@ class VmExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"恢复检查点失败: {e}")
 
+    @require_connection
     def delete_vm_checkpoint(self, name_or_id: str, checkpoint_id: str) -> Dict[str, Any]:
         """删除 VM 检查点
 
@@ -962,14 +892,11 @@ class VmExtendedMCP:
         Returns:
             删除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         vm = self._find_vm(name_or_id)
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+        vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
         checkpoints_service = vm_service.checkpoints_service()
         checkpoint_service = checkpoints_service.checkpoint_service(checkpoint_id)
 

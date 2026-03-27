@@ -6,6 +6,8 @@ oVirt MCP Server - RBAC 管理模块
 from typing import Dict, List, Any, Optional
 import logging
 
+from .base_mcp import BaseMCP
+from .decorators import require_connection
 from .search_utils import sanitize_search_value as _sanitize_search_value
 
 try:
@@ -16,39 +18,17 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class RbacMCP:
+class RbacMCP(BaseMCP):
     """RBAC 管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
+        super().__init__(ovirt_mcp)
 
-    # ── 资源查找辅助方法 ─────────────────────────────────────────────────
-
-    def _find_user(self, name_or_id: str) -> Optional[Any]:
-        """查找用户（按名称或 ID）"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        users_service = self.ovirt.connection.system_service().users_service()
-
-        # 先尝试按 ID 查找
-        try:
-            user = users_service.user_service(name_or_id).get()
-            if user:
-                return user
-        except Exception:
-            pass
-
-        # 按名称搜索
-        users = users_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return users[0] if users else None
+    # ── 资源查找辅助方法（BaseMCP 未提供的）───────────────────────────────
 
     def _find_group(self, name_or_id: str) -> Optional[Any]:
         """查找组（按名称或 ID）"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        groups_service = self.ovirt.connection.system_service().groups_service()
+        groups_service = self.connection.system_service().groups_service()
 
         # 先尝试按 ID 查找
         try:
@@ -62,31 +42,9 @@ class RbacMCP:
         groups = groups_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
         return groups[0] if groups else None
 
-    def _find_role(self, name_or_id: str) -> Optional[Any]:
-        """查找角色（按名称或 ID）"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        roles_service = self.ovirt.connection.system_service().roles_service()
-
-        # 先尝试按 ID 查找
-        try:
-            role = roles_service.role_service(name_or_id).get()
-            if role:
-                return role
-        except Exception:
-            pass
-
-        # 按名称搜索
-        roles = roles_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return roles[0] if roles else None
-
     def _find_tag(self, name_or_id: str) -> Optional[Any]:
         """查找标签（按名称或 ID）"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        tags_service = self.ovirt.connection.system_service().tags_service()
+        tags_service = self.connection.system_service().tags_service()
 
         # 先尝试按 ID 查找
         try:
@@ -110,7 +68,7 @@ class RbacMCP:
         Returns:
             资源对应的 service 对象
         """
-        system_service = self.ovirt.connection.system_service()
+        system_service = self.connection.system_service()
         resource_type_lower = resource_type.lower()
 
         service_map = {
@@ -128,12 +86,8 @@ class RbacMCP:
 
         return service_map[resource_type_lower]()
 
-    def _find_resource(self, resource_type: str, name_or_id: str) -> Optional[Any]:
+    def _find_resource_by_type(self, resource_type: str, name_or_id: str) -> Optional[Any]:
         """根据资源类型查找资源"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        system_service = self.ovirt.connection.system_service()
         resource_type_lower = resource_type.lower()
 
         # 定义每种资源类型的查找逻辑
@@ -152,106 +106,9 @@ class RbacMCP:
 
         return find_map[resource_type_lower]()
 
-    def _find_vm(self, name_or_id: str) -> Optional[Any]:
-        """查找虚拟机"""
-        vms_service = self.ovirt.connection.system_service().vms_service()
-
-        try:
-            vm = vms_service.vm_service(name_or_id).get()
-            if vm:
-                return vm
-        except Exception:
-            pass
-
-        vms = vms_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return vms[0] if vms else None
-
-    def _find_host(self, name_or_id: str) -> Optional[Any]:
-        """查找主机"""
-        hosts_service = self.ovirt.connection.system_service().hosts_service()
-
-        try:
-            host = hosts_service.host_service(name_or_id).get()
-            if host:
-                return host
-        except Exception:
-            pass
-
-        hosts = hosts_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return hosts[0] if hosts else None
-
-    def _find_cluster(self, name_or_id: str) -> Optional[Any]:
-        """查找集群"""
-        clusters_service = self.ovirt.connection.system_service().clusters_service()
-
-        try:
-            cluster = clusters_service.cluster_service(name_or_id).get()
-            if cluster:
-                return cluster
-        except Exception:
-            pass
-
-        clusters = clusters_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return clusters[0] if clusters else None
-
-    def _find_datacenter(self, name_or_id: str) -> Optional[Any]:
-        """查找数据中心"""
-        dcs_service = self.ovirt.connection.system_service().data_centers_service()
-
-        try:
-            dc = dcs_service.data_center_service(name_or_id).get()
-            if dc:
-                return dc
-        except Exception:
-            pass
-
-        dcs = dcs_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return dcs[0] if dcs else None
-
-    def _find_network(self, name_or_id: str) -> Optional[Any]:
-        """查找网络"""
-        networks_service = self.ovirt.connection.system_service().networks_service()
-
-        try:
-            network = networks_service.network_service(name_or_id).get()
-            if network:
-                return network
-        except Exception:
-            pass
-
-        networks = networks_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return networks[0] if networks else None
-
-    def _find_storage_domain(self, name_or_id: str) -> Optional[Any]:
-        """查找存储域"""
-        sds_service = self.ovirt.connection.system_service().storage_domains_service()
-
-        try:
-            sd = sds_service.storage_domain_service(name_or_id).get()
-            if sd:
-                return sd
-        except Exception:
-            pass
-
-        sds = sds_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return sds[0] if sds else None
-
-    def _find_template(self, name_or_id: str) -> Optional[Any]:
-        """查找模板"""
-        templates_service = self.ovirt.connection.system_service().templates_service()
-
-        try:
-            template = templates_service.template_service(name_or_id).get()
-            if template:
-                return template
-        except Exception:
-            pass
-
-        templates = templates_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return templates[0] if templates else None
-
     # ── User 管理 ──────────────────────────────────────────────────────────
 
+    @require_connection
     def list_users(self, search: str = None) -> List[Dict]:
         """列出用户
 
@@ -261,10 +118,7 @@ class RbacMCP:
         Returns:
             用户列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        users_service = self.ovirt.connection.system_service().users_service()
+        users_service = self.connection.system_service().users_service()
 
         try:
             if search:
@@ -289,6 +143,7 @@ class RbacMCP:
 
         return result
 
+    @require_connection
     def get_user(self, name_or_id: str) -> Optional[Dict]:
         """获取用户详情
 
@@ -305,7 +160,7 @@ class RbacMCP:
         # 获取用户的权限列表
         permissions = []
         try:
-            user_service = self.ovirt.connection.system_service().users_service().user_service(user.id)
+            user_service = self.connection.system_service().users_service().user_service(user.id)
             perms_service = user_service.permissions_service()
             perms = perms_service.list()
             permissions = [
@@ -334,6 +189,7 @@ class RbacMCP:
 
     # ── Group 管理 ─────────────────────────────────────────────────────────
 
+    @require_connection
     def list_groups(self, search: str = None) -> List[Dict]:
         """列出用户组
 
@@ -343,10 +199,7 @@ class RbacMCP:
         Returns:
             用户组列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        groups_service = self.ovirt.connection.system_service().groups_service()
+        groups_service = self.connection.system_service().groups_service()
 
         try:
             if search:
@@ -367,6 +220,7 @@ class RbacMCP:
 
         return result
 
+    @require_connection
     def get_group(self, name_or_id: str) -> Optional[Dict]:
         """获取用户组详情
 
@@ -383,7 +237,7 @@ class RbacMCP:
         # 获取组的权限列表
         permissions = []
         try:
-            group_service = self.ovirt.connection.system_service().groups_service().group_service(group.id)
+            group_service = self.connection.system_service().groups_service().group_service(group.id)
             perms_service = group_service.permissions_service()
             perms = perms_service.list()
             permissions = [
@@ -408,16 +262,14 @@ class RbacMCP:
 
     # ── Role 管理 ──────────────────────────────────────────────────────────
 
+    @require_connection
     def list_roles(self) -> List[Dict]:
         """列出所有角色
 
         Returns:
             角色列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        roles_service = self.ovirt.connection.system_service().roles_service()
+        roles_service = self.connection.system_service().roles_service()
 
         try:
             roles = roles_service.list()
@@ -436,6 +288,7 @@ class RbacMCP:
 
         return result
 
+    @require_connection
     def get_role(self, name_or_id: str) -> Optional[Dict]:
         """获取角色详情（包含权限列表）
 
@@ -452,7 +305,7 @@ class RbacMCP:
         # 获取角色的权限列表（permits）
         permits = []
         try:
-            role_service = self.ovirt.connection.system_service().roles_service().role_service(role.id)
+            role_service = self.connection.system_service().roles_service().role_service(role.id)
             permits_service = role_service.permits_service()
             permit_list = permits_service.list()
             permits = [
@@ -475,6 +328,7 @@ class RbacMCP:
             "permit_count": len(permits),
         }
 
+    @require_connection
     def create_role(self, name: str, description: str = "",
                    administrative: bool = False,
                    permit_ids: List[str] = None) -> Dict[str, Any]:
@@ -489,10 +343,7 @@ class RbacMCP:
         Returns:
             创建结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        roles_service = self.ovirt.connection.system_service().roles_service()
+        roles_service = self.connection.system_service().roles_service()
 
         # 检查是否已存在
         existing = roles_service.list(search=f"name={_sanitize_search_value(name)}")
@@ -523,6 +374,7 @@ class RbacMCP:
         except Exception as e:
             raise RuntimeError(f"创建角色失败: {e}")
 
+    @require_connection
     def delete_role(self, name_or_id: str) -> Dict[str, Any]:
         """删除角色
 
@@ -532,9 +384,6 @@ class RbacMCP:
         Returns:
             删除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         role = self._find_role(name_or_id)
         if not role:
             raise ValueError(f"角色不存在: {name_or_id}")
@@ -544,7 +393,7 @@ class RbacMCP:
                                                             '00000000-0000-0000-0000-000000000002']:
             raise ValueError("不能删除系统内置角色")
 
-        roles_service = self.ovirt.connection.system_service().roles_service()
+        roles_service = self.connection.system_service().roles_service()
         role_service = roles_service.role_service(role.id)
 
         try:
@@ -555,23 +404,18 @@ class RbacMCP:
 
     # ── Permit 管理 ────────────────────────────────────────────────────────
 
+    @require_connection
     def list_permits(self) -> List[Dict]:
         """列出所有权限单元
 
         Returns:
             权限单元列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 通过获取所有角色的 permits 来汇总
-        # 也可以使用 system_service().clusters_service() 等来获取 permits
-        # 但最直接的方式是从角色中提取
-
         permits_map = {}  # 用 id 去重
 
         try:
-            roles_service = self.ovirt.connection.system_service().roles_service()
+            roles_service = self.connection.system_service().roles_service()
             roles = roles_service.list()
 
             for role in roles:
@@ -598,6 +442,7 @@ class RbacMCP:
 
     # ── Permission 管理 ────────────────────────────────────────────────────
 
+    @require_connection
     def list_permissions(self, resource_type: str, resource_id: str) -> List[Dict]:
         """列出资源的权限
 
@@ -608,11 +453,8 @@ class RbacMCP:
         Returns:
             权限列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 先查找资源
-        resource = self._find_resource(resource_type, resource_id)
+        resource = self._find_resource_by_type(resource_type, resource_id)
         if not resource:
             raise ValueError(f"资源不存在: {resource_type}/{resource_id}")
 
@@ -640,6 +482,7 @@ class RbacMCP:
 
         return result
 
+    @require_connection
     def assign_permission(self, resource_type: str, resource_id: str,
                          user_or_group: str, role_name: str,
                          principal_name: str) -> Dict[str, Any]:
@@ -655,15 +498,12 @@ class RbacMCP:
         Returns:
             分配结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 验证参数
         if user_or_group.lower() not in ["user", "group"]:
             raise ValueError("user_or_group 必须是 'user' 或 'group'")
 
         # 查找资源
-        resource = self._find_resource(resource_type, resource_id)
+        resource = self._find_resource_by_type(resource_type, resource_id)
         if not resource:
             raise ValueError(f"资源不存在: {resource_type}/{resource_id}")
 
@@ -715,6 +555,7 @@ class RbacMCP:
         except Exception as e:
             raise RuntimeError(f"分配权限失败: {e}")
 
+    @require_connection
     def revoke_permission(self, resource_type: str, resource_id: str,
                          permission_id: str) -> Dict[str, Any]:
         """撤销权限
@@ -727,11 +568,8 @@ class RbacMCP:
         Returns:
             撤销结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 查找资源
-        resource = self._find_resource(resource_type, resource_id)
+        resource = self._find_resource_by_type(resource_type, resource_id)
         if not resource:
             raise ValueError(f"资源不存在: {resource_type}/{resource_id}")
 
@@ -748,16 +586,14 @@ class RbacMCP:
 
     # ── Tag 管理 ───────────────────────────────────────────────────────────
 
+    @require_connection
     def list_tags(self) -> List[Dict]:
         """列出所有标签
 
         Returns:
             标签列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        tags_service = self.ovirt.connection.system_service().tags_service()
+        tags_service = self.connection.system_service().tags_service()
 
         try:
             tags = tags_service.list()
@@ -776,6 +612,7 @@ class RbacMCP:
 
         return result
 
+    @require_connection
     def create_tag(self, name: str, description: str = "",
                   parent_name: str = None) -> Dict[str, Any]:
         """创建标签
@@ -788,10 +625,7 @@ class RbacMCP:
         Returns:
             创建结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        tags_service = self.ovirt.connection.system_service().tags_service()
+        tags_service = self.connection.system_service().tags_service()
 
         # 检查是否已存在
         existing = tags_service.list(search=f"name={_sanitize_search_value(name)}")
@@ -823,6 +657,7 @@ class RbacMCP:
         except Exception as e:
             raise RuntimeError(f"创建标签失败: {e}")
 
+    @require_connection
     def delete_tag(self, name_or_id: str) -> Dict[str, Any]:
         """删除标签
 
@@ -832,14 +667,11 @@ class RbacMCP:
         Returns:
             删除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         tag = self._find_tag(name_or_id)
         if not tag:
             raise ValueError(f"标签不存在: {name_or_id}")
 
-        tags_service = self.ovirt.connection.system_service().tags_service()
+        tags_service = self.connection.system_service().tags_service()
         tag_service = tags_service.tag_service(tag.id)
 
         try:
@@ -848,6 +680,7 @@ class RbacMCP:
         except Exception as e:
             raise RuntimeError(f"删除标签失败: {e}")
 
+    @require_connection
     def assign_tag(self, resource_type: str, resource_id: str,
                   tag_name: str) -> Dict[str, Any]:
         """为资源分配标签
@@ -860,11 +693,8 @@ class RbacMCP:
         Returns:
             分配结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 查找资源
-        resource = self._find_resource(resource_type, resource_id)
+        resource = self._find_resource_by_type(resource_type, resource_id)
         if not resource:
             raise ValueError(f"资源不存在: {resource_type}/{resource_id}")
 
@@ -900,6 +730,7 @@ class RbacMCP:
         except Exception as e:
             raise RuntimeError(f"分配标签失败: {e}")
 
+    @require_connection
     def unassign_tag(self, resource_type: str, resource_id: str,
                     tag_name: str) -> Dict[str, Any]:
         """移除资源的标签
@@ -912,11 +743,8 @@ class RbacMCP:
         Returns:
             移除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 查找资源
-        resource = self._find_resource(resource_type, resource_id)
+        resource = self._find_resource_by_type(resource_type, resource_id)
         if not resource:
             raise ValueError(f"资源不存在: {resource_type}/{resource_id}")
 
@@ -936,6 +764,7 @@ class RbacMCP:
         except Exception as e:
             raise RuntimeError(f"移除标签失败: {e}")
 
+    @require_connection
     def list_resource_tags(self, resource_type: str, resource_id: str) -> List[Dict]:
         """列出资源的标签
 
@@ -946,11 +775,8 @@ class RbacMCP:
         Returns:
             标签列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 查找资源
-        resource = self._find_resource(resource_type, resource_id)
+        resource = self._find_resource_by_type(resource_type, resource_id)
         if not resource:
             raise ValueError(f"资源不存在: {resource_type}/{resource_id}")
 
@@ -976,6 +802,7 @@ class RbacMCP:
 
     # ── User 扩展管理 ────────────────────────────────────────────────────────
 
+    @require_connection
     def create_user(self, user_name: str, domain: str,
                    email: str = None, department: str = None) -> Dict[str, Any]:
         """创建用户
@@ -989,13 +816,10 @@ class RbacMCP:
         Returns:
             创建结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        users_service = self.ovirt.connection.system_service().users_service()
+        users_service = self.connection.system_service().users_service()
 
         # 查找域
-        domains_service = self.ovirt.connection.system_service().domains_service()
+        domains_service = self.connection.system_service().domains_service()
         domains = domains_service.list(search=f"name={_sanitize_search_value(domain)}")
         if not domains:
             raise ValueError(f"域不存在: {domain}")
@@ -1018,6 +842,7 @@ class RbacMCP:
         except Exception as e:
             raise RuntimeError(f"创建用户失败: {e}")
 
+    @require_connection
     def update_user(self, name_or_id: str, email: str = None,
                    department: str = None) -> Dict[str, Any]:
         """更新用户
@@ -1030,14 +855,11 @@ class RbacMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         user = self._find_user(name_or_id)
         if not user:
             raise ValueError(f"用户不存在: {name_or_id}")
 
-        users_service = self.ovirt.connection.system_service().users_service()
+        users_service = self.connection.system_service().users_service()
         user_service = users_service.user_service(user.id)
 
         if email is not None:
@@ -1051,6 +873,7 @@ class RbacMCP:
         except Exception as e:
             raise RuntimeError(f"更新用户失败: {e}")
 
+    @require_connection
     def delete_user(self, name_or_id: str) -> Dict[str, Any]:
         """删除用户
 
@@ -1060,14 +883,11 @@ class RbacMCP:
         Returns:
             删除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         user = self._find_user(name_or_id)
         if not user:
             raise ValueError(f"用户不存在: {name_or_id}")
 
-        users_service = self.ovirt.connection.system_service().users_service()
+        users_service = self.connection.system_service().users_service()
         user_service = users_service.user_service(user.id)
 
         try:
@@ -1076,6 +896,7 @@ class RbacMCP:
         except Exception as e:
             raise RuntimeError(f"删除用户失败: {e}")
 
+    @require_connection
     def list_user_groups(self, name_or_id: str) -> List[Dict]:
         """列出用户所属的组
 
@@ -1085,14 +906,11 @@ class RbacMCP:
         Returns:
             组列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         user = self._find_user(name_or_id)
         if not user:
             raise ValueError(f"用户不存在: {name_or_id}")
 
-        users_service = self.ovirt.connection.system_service().users_service()
+        users_service = self.connection.system_service().users_service()
         user_service = users_service.user_service(user.id)
         groups_service = user_service.groups_service()
 
@@ -1113,6 +931,7 @@ class RbacMCP:
 
     # ── Role 扩展管理 ────────────────────────────────────────────────────────
 
+    @require_connection
     def update_role(self, name_or_id: str, new_name: str = None,
                    description: str = None,
                    administrative: bool = None) -> Dict[str, Any]:
@@ -1127,14 +946,11 @@ class RbacMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         role = self._find_role(name_or_id)
         if not role:
             raise ValueError(f"角色不存在: {name_or_id}")
 
-        roles_service = self.ovirt.connection.system_service().roles_service()
+        roles_service = self.connection.system_service().roles_service()
         role_service = roles_service.role_service(role.id)
 
         if new_name:
@@ -1152,16 +968,14 @@ class RbacMCP:
 
     # ── Filter 管理 ──────────────────────────────────────────────────────────
 
+    @require_connection
     def list_filters(self) -> List[Dict]:
         """列出权限过滤器
 
         Returns:
             过滤器列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        filters_service = self.ovirt.connection.system_service().filters_service()
+        filters_service = self.connection.system_service().filters_service()
 
         try:
             filters = filters_service.list()
