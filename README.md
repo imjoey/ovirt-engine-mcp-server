@@ -15,14 +15,14 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server for [o
 ### 1. Install
 
 ```bash
-pip install ovirt-mcp-server
+pip install ovirt-engine-mcp-server
 ```
 
 Or from source:
 
 ```bash
-git clone https://github.com/imjoey/ovirt-mcp-server.git
-cd ovirt-mcp-server
+git clone https://github.com/imjoey/ovirt-engine-mcp-server.git
+cd ovirt-engine-mcp-server
 pip install -e .
 ```
 
@@ -47,7 +47,7 @@ OVIRT_ENGINE_USER: admin@internal
 ### 3. Run
 
 ```bash
-ovirt-mcp
+ovirt-engine-mcp
 ```
 
 ## Claude Desktop Integration
@@ -58,7 +58,7 @@ Add to your Claude Desktop config file (`claude_desktop_config.json`):
 {
   "mcpServers": {
     "ovirt": {
-      "command": "ovirt-mcp",
+      "command": "ovirt-engine-mcp",
       "env": {
         "OVIRT_ENGINE_URL": "https://ovirt-engine.example.com",
         "OVIRT_ENGINE_USER": "admin@internal",
@@ -72,11 +72,11 @@ Add to your Claude Desktop config file (`claude_desktop_config.json`):
 ## Docker
 
 ```bash
-docker build -t ovirt-mcp-server .
+docker build -t ovirt-engine-mcp-server .
 docker run -e OVIRT_ENGINE_URL=https://ovirt-engine.example.com \
            -e OVIRT_ENGINE_USER=admin@internal \
            -e OVIRT_ENGINE_PASSWORD=your-password \
-           ovirt-mcp-server
+           ovirt-engine-mcp-server
 ```
 
 ## Available Tools
