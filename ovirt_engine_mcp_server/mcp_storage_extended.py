@@ -373,7 +373,7 @@ class StorageExtendedMCP(BaseMCP):
             raise ValueError(f"存储域不存在: {name_or_id}")
 
         sd_service = self.connection.system_service().storage_domains_service().storage_domain_service(sd.id)
-        disks_service = sd_service.disk_service()
+        disks_service = sd_service.disks_service()
 
         try:
             disks = disks_service.list()
