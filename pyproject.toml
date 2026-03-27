@@ -42,8 +42,7 @@ dev = [
     "ruff>=0.1.0",
 ]
 
-[project.scripts]
-ovirt-engine-mcp = "src.server:main"
+ovirt_engine_mcp_server.server:main
 
 [project.urls]
 Homepage = "https://github.com/imjoey/ovirt-engine-mcp-server"
@@ -52,7 +51,7 @@ Issues = "https://github.com/imjoey/ovirt-engine-mcp-server/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src*"]
+include = ["ovirt_engine_mcp_server*"]
 
 [tool.setuptools.package-dir]
 "" = "."

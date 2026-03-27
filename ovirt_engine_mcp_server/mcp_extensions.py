@@ -4,7 +4,11 @@ Ovirt MCP Server - 网络和集群增强模块
 """
 from typing import Dict, List, Any, Optional
 import logging
+
+from .base_mcp import BaseMCP
+from .decorators import require_connection
 from .search_utils import sanitize_search_value as _sanitize_search_value
+
 try:
     import ovirtsdk4 as sdk
 except ImportError:
@@ -13,44 +17,17 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class NetworkMCP:
+class NetworkMCP(BaseMCP):
     """网络管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
-
-    def _find_network(self, name_or_id: str) -> Optional[Any]:
-        """查找网络（按名称或 ID）"""
-        networks_service = self.ovirt.connection.system_service().networks_service()
-
-        try:
-            network = networks_service.network_service(name_or_id).get()
-            if network:
-                return network
-        except Exception:
-            pass
-
-        networks = networks_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return networks[0] if networks else None
-
-    def _find_datacenter(self, name_or_id: str) -> Optional[Any]:
-        """查找数据中心"""
-        dcs_service = self.ovirt.connection.system_service().data_centers_service()
-
-        try:
-            dc = dcs_service.data_center_service(name_or_id).get()
-            if dc:
-                return dc
-        except Exception:
-            pass
-
-        dcs = dcs_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return dcs[0] if dcs else None
+        super().__init__(ovirt_mcp)
 
     def list_networks(self, cluster: str = None, datacenter: str = None) -> List[Dict]:
         """列出网络"""
         return self.ovirt.list_networks(cluster)
 
+    @require_connection
     def get_network(self, name_or_id: str) -> Optional[Dict]:
         """获取网络详情
 
@@ -60,9 +37,6 @@ class NetworkMCP:
         Returns:
             网络详情
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         network = self._find_network(name_or_id)
         if not network:
             return None
