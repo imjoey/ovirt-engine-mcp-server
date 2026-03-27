@@ -24,16 +24,19 @@ class HostExtendedMCP(BaseMCP):
     def __init__(self, ovirt_mcp):
         super().__init__(ovirt_mcp)
 
+    @require_connection
     def get_host(self, name_or_id: str) -> Optional[Dict]:
         """获取主机详情"""
         host = self._find_host(name_or_id)
         if not host:
             return None
 
+        # Get host_service outside try blocks to avoid scope issues
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
+
         # 获取主机网络接口
         nics = []
         try:
-            host_service = self.connection.system_service().hosts_service().host_service(host.id)
             nics_service = host_service.nics_service()
             nic_list = nics_service.list()
             nics = [

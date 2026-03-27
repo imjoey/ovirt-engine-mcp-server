@@ -24,6 +24,7 @@ class DiskExtendedMCP(BaseMCP):
     def __init__(self, ovirt_mcp):
         super().__init__(ovirt_mcp)
 
+    @require_connection
     def get_disk(self, name_or_id: str) -> Optional[Dict]:
         """获取磁盘详情"""
         disk = self._find_disk(name_or_id)
@@ -195,6 +196,7 @@ class DiskExtendedMCP(BaseMCP):
         except Exception as e:
             raise RuntimeError(f"移动磁盘失败: {e}")
 
+    @require_connection
     def get_disk_stats(self, name_or_id: str) -> Dict[str, Any]:
         """获取磁盘统计信息"""
         disk = self._find_disk(name_or_id)

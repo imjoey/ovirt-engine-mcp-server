@@ -43,7 +43,7 @@ dev = [
 ]
 
 [project.scripts]
-ovirt-mcp-server = "ovirt_engine_mcp_server.server:main"
+ovirt-engine-mcp = "ovirt_engine_mcp_server.server:main"
 
 [project.urls]
 Homepage = "https://github.com/imjoey/ovirt-engine-mcp-server"

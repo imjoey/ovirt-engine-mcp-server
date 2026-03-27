@@ -46,6 +46,7 @@ class DataCenterMCP(BaseMCP):
 
         return result
 
+    @require_connection
     def get_datacenter(self, name_or_id: str) -> Optional[Dict]:
         """获取数据中心详情"""
         dc = self._find_datacenter(name_or_id)

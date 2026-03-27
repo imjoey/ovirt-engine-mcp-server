@@ -27,8 +27,8 @@ RESOURCE_SERVICE_GETTERS: Dict[str, Callable[[Any], Any]] = {
     "permission": lambda s: s.permissions_service(),
     "event": lambda s: s.events_service(),
     "job": lambda s: s.jobs_service(),
-    "quota": lambda s: s.quotas_service(),
-    "affinity_group": lambda s: s.affinity_groups_service(),
+    # Note: quota is under datacenter, not system_service
+    # Note: affinity_group is under cluster, not system_service
     "mac_pool": lambda s: s.mac_pools_service(),
     "network_filter": lambda s: s.network_filters_service(),
     "qos": lambda s: s.qoss_service(),
@@ -53,8 +53,8 @@ RESOURCE_SERVICE_NAMES: Dict[str, str] = {
     "permission": "permission_service",
     "event": "event_service",
     "job": "job_service",
-    "quota": "quota_service",
-    "affinity_group": "affinity_group_service",
+    # Note: quota is under datacenter, not system_service
+    # Note: affinity_group is under cluster, not system_service
     "mac_pool": "mac_pool_service",
     "network_filter": "network_filter_service",
     "qos": "qos_service",
@@ -183,7 +183,3 @@ class BaseMCP:
     def _find_role(self, name_or_id: str) -> Optional[Any]:
         """Find a role by name or ID."""
         return self._find_resource("role", name_or_id)
-
-    def _find_quota(self, name_or_id: str) -> Optional[Any]:
-        """Find a quota by name or ID."""
-        return self._find_resource("quota", name_or_id)

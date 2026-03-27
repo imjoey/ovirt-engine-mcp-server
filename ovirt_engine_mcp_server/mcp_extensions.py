@@ -53,6 +53,7 @@ class NetworkMCP(BaseMCP):
             "usages": [str(u.value) for u in network.usages] if network.usages else [],
         }
 
+    @require_connection
     def list_vnics(self, name_or_id: str) -> List[Dict]:
         """列出 VM 的网卡"""
         vm = self.ovirt._find_vm(name_or_id)
@@ -73,6 +74,7 @@ class NetworkMCP(BaseMCP):
             for n in nics
         ]
 
+    @require_connection
     def add_nic(self, name_or_id: str, nic_name: str, network: str,
                interface: str = "virtio") -> Dict[str, Any]:
         """添加网卡"""
@@ -97,6 +99,7 @@ class NetworkMCP(BaseMCP):
         except Exception as e:
             raise RuntimeError(f"添加网卡失败: {e}")
 
+    @require_connection
     def remove_nic(self, name_or_id: str, nic_name: str) -> Dict[str, Any]:
         """移除网卡"""
         vm = self.ovirt._find_vm(name_or_id)
