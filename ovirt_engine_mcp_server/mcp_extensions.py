@@ -58,7 +58,7 @@ class NetworkMCP(BaseMCP):
         vm = self.ovirt._find_vm(name_or_id)
         if not vm: raise ValueError(f"VM not found: {name_or_id}")
 
-        nics_service = self.ovirt.connection.system_service().vms_service().vm_service(vm["id"]).nics_service()
+        nics_service = self.connection.system_service().vms_service().vm_service(vm["id"]).nics_service()
         nics = nics_service.list()
 
         return [
@@ -83,7 +83,7 @@ class NetworkMCP(BaseMCP):
         # 查找网络
         net = self._find_network(network)
 
-        nics_service = self.ovirt.connection.system_service().vms_service().vm_service(vm["id"]).nics_service()
+        nics_service = self.connection.system_service().vms_service().vm_service(vm["id"]).nics_service()
 
         try:
             nic = nics_service.add(
@@ -103,7 +103,7 @@ class NetworkMCP(BaseMCP):
         if not vm:
             raise ValueError(f"VM 不存在: {name_or_id}")
 
-        nics_service = self.ovirt.connection.system_service().vms_service().vm_service(vm["id"]).nics_service()
+        nics_service = self.connection.system_service().vms_service().vm_service(vm["id"]).nics_service()
         nics = nics_service.list()
 
         nic_id = None
@@ -118,17 +118,16 @@ class NetworkMCP(BaseMCP):
         nics_service.nic_service(nic_id).remove()
         return {"success": True, "message": f"网卡 {nic_name} 已移除"}
 
+    @require_connection
     def create_network(self, name: str, datacenter: str, vlan: str = None,
                       description: str = "", mtu: int = 0) -> Dict[str, Any]:
         """创建网络"""
-        if not self.ovirt.connected: raise RuntimeError("未连接")
-
         # 获取数据中心
-        dcs = self.ovirt.connection.system_service().data_centers_service().list(search=f"name={_sanitize_search_value(datacenter)}")
+        dcs = self.connection.system_service().data_centers_service().list(search=f"name={_sanitize_search_value(datacenter)}")
         if not dcs: raise ValueError(f"数据中心不存在: {datacenter}")
 
         # 创建网络
-        network = self.ovirt.connection.system_service().networks_service().add(
+        network = self.connection.system_service().networks_service().add(
             sdk.types.Network(
                 name=name,
                 description=description,
@@ -140,15 +139,14 @@ class NetworkMCP(BaseMCP):
 
         return {"success": True, "message": f"网络 {name} 已创建", "network_id": network.id}
 
+    @require_connection
     def update_network(self, name: str, new_name: str = None, description: str = None,
                       mtu: int = None) -> Dict[str, Any]:
         """更新网络"""
-        if not self.ovirt.connected: raise RuntimeError("未连接")
-
-        networks = self.ovirt.connection.system_service().networks_service().list(search=f"name={_sanitize_search_value(name)}")
+        networks = self.connection.system_service().networks_service().list(search=f"name={_sanitize_search_value(name)}")
         if not networks: raise ValueError(f"网络不存在: {name}")
 
-        network_service = self.ovirt.connection.system_service().networks_service().network_service(networks[0].id)
+        network_service = self.connection.system_service().networks_service().network_service(networks[0].id)
         network = network_service.get()
 
         if new_name:
@@ -162,19 +160,19 @@ class NetworkMCP(BaseMCP):
 
         return {"success": True, "message": f"网络已更新"}
 
+    @require_connection
     def delete_network(self, name: str) -> Dict[str, Any]:
         """删除网络"""
-        if not self.ovirt.connected: raise RuntimeError("未连接")
-
-        networks = self.ovirt.connection.system_service().networks_service().list(search=f"name={_sanitize_search_value(name)}")
+        networks = self.connection.system_service().networks_service().list(search=f"name={_sanitize_search_value(name)}")
         if not networks: raise ValueError(f"网络不存在: {name}")
 
-        self.ovirt.connection.system_service().networks_service().network_service(networks[0].id).remove()
+        self.connection.system_service().networks_service().network_service(networks[0].id).remove()
 
         return {"success": True, "message": f"网络 {name} 已删除"}
 
     # ── VNIC Profile 管理 ──────────────────────────────────────────────────
 
+    @require_connection
     def list_vnic_profiles(self, network: str = None) -> List[Dict]:
         """列出 VNIC Profile
 
@@ -184,10 +182,7 @@ class NetworkMCP(BaseMCP):
         Returns:
             VNIC Profile 列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        profiles_service = self.ovirt.connection.system_service().vnic_profiles_service()
+        profiles_service = self.connection.system_service().vnic_profiles_service()
 
         search = None
         if network:
@@ -212,6 +207,7 @@ class NetworkMCP(BaseMCP):
             for p in profiles
         ]
 
+    @require_connection
     def get_vnic_profile(self, name_or_id: str) -> Optional[Dict]:
         """获取 VNIC Profile 详情
 
@@ -221,10 +217,7 @@ class NetworkMCP(BaseMCP):
         Returns:
             Profile 详情
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        profiles_service = self.ovirt.connection.system_service().vnic_profiles_service()
+        profiles_service = self.connection.system_service().vnic_profiles_service()
 
         try:
             profile = profiles_service.vnic_profile_service(name_or_id).get()
@@ -255,6 +248,7 @@ class NetworkMCP(BaseMCP):
             ] if hasattr(profile, 'custom_properties') and profile.custom_properties else [],
         }
 
+    @require_connection
     def create_vnic_profile(self, name: str, network: str,
                            description: str = "",
                            port_mirroring: bool = False) -> Dict[str, Any]:
@@ -269,15 +263,12 @@ class NetworkMCP(BaseMCP):
         Returns:
             创建结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 查找网络
         net = self._find_network(network)
         if not net:
             raise ValueError(f"网络不存在: {network}")
 
-        profiles_service = self.ovirt.connection.system_service().vnic_profiles_service()
+        profiles_service = self.connection.system_service().vnic_profiles_service()
 
         try:
             profile = profiles_service.add(
@@ -296,6 +287,7 @@ class NetworkMCP(BaseMCP):
         except Exception as e:
             raise RuntimeError(f"创建 VNIC Profile 失败: {e}")
 
+    @require_connection
     def update_vnic_profile(self, name_or_id: str, new_name: str = None,
                            description: str = None,
                            port_mirroring: bool = None) -> Dict[str, Any]:
@@ -310,10 +302,7 @@ class NetworkMCP(BaseMCP):
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        profiles_service = self.ovirt.connection.system_service().vnic_profiles_service()
+        profiles_service = self.connection.system_service().vnic_profiles_service()
 
         # 查找 profile
         profile_id = None
@@ -339,6 +328,7 @@ class NetworkMCP(BaseMCP):
         profile_service.update(profile)
         return {"success": True, "message": f"VNIC Profile 已更新"}
 
+    @require_connection
     def delete_vnic_profile(self, name_or_id: str) -> Dict[str, Any]:
         """删除 VNIC Profile
 
@@ -348,10 +338,7 @@ class NetworkMCP(BaseMCP):
         Returns:
             删除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        profiles_service = self.ovirt.connection.system_service().vnic_profiles_service()
+        profiles_service = self.connection.system_service().vnic_profiles_service()
 
         # 查找 profile
         profile_id = None
@@ -370,16 +357,14 @@ class NetworkMCP(BaseMCP):
 
     # ── Network Filter 管理 ────────────────────────────────────────────────
 
+    @require_connection
     def list_network_filters(self) -> List[Dict]:
         """列出网络过滤器
 
         Returns:
             网络过滤器列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        filters_service = self.ovirt.connection.system_service().network_filters_service()
+        filters_service = self.connection.system_service().network_filters_service()
 
         try:
             filters = filters_service.list()
@@ -398,16 +383,14 @@ class NetworkMCP(BaseMCP):
 
     # ── MAC Pool 管理 ──────────────────────────────────────────────────────
 
+    @require_connection
     def list_mac_pools(self) -> List[Dict]:
         """列出 MAC 地址池
 
         Returns:
             MAC 地址池列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        pools_service = self.ovirt.connection.system_service().mac_pools_service()
+        pools_service = self.connection.system_service().mac_pools_service()
 
         try:
             pools = pools_service.list()
@@ -431,6 +414,7 @@ class NetworkMCP(BaseMCP):
 
     # ── QoS 管理 ────────────────────────────────────────────────────────────
 
+    @require_connection
     def list_qos(self, datacenter: str = None) -> List[Dict]:
         """列出 QoS 配置
 
@@ -440,10 +424,7 @@ class NetworkMCP(BaseMCP):
         Returns:
             QoS 列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        qos_service = self.ovirt.connection.system_service().qoss_service()
+        qos_service = self.connection.system_service().qoss_service()
 
         try:
             qoss = qos_service.list()
@@ -471,35 +452,20 @@ class NetworkMCP(BaseMCP):
         return result
 
 
-class ClusterMCP:
+class ClusterMCP(BaseMCP):
     """集群管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
-
-    def _find_cluster(self, name_or_id: str) -> Optional[Any]:
-        """查找集群（按名称或 ID）"""
-        clusters_service = self.ovirt.connection.system_service().clusters_service()
-
-        try:
-            cluster = clusters_service.cluster_service(name_or_id).get()
-            if cluster:
-                return cluster
-        except Exception:
-            pass
-
-        clusters = clusters_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return clusters[0] if clusters else None
+        super().__init__(ovirt_mcp)
 
     def list_clusters(self) -> List[Dict]:
         """列出集群"""
         return self.ovirt.list_clusters()
 
+    @require_connection
     def get_cluster(self, name: str) -> Optional[Dict]:
         """获取集群详情"""
-        if not self.ovirt.connected: raise RuntimeError("未连接")
-
-        clusters = self.ovirt.connection.system_service().clusters_service().list(search=f"name={_sanitize_search_value(name)}")
+        clusters = self.connection.system_service().clusters_service().list(search=f"name={_sanitize_search_value(name)}")
         if not clusters: return None
 
         c = clusters[0]
@@ -530,6 +496,7 @@ class ClusterMCP:
             "trusted_service": c.trusted_service if hasattr(c, 'trusted_service') else False,
         }
 
+    @require_connection
     def create_cluster(self, name: str, datacenter: str, cpu_type: str,
                       description: str = "",
                       gluster_service: bool = False,
@@ -547,17 +514,14 @@ class ClusterMCP:
         Returns:
             创建结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 查找数据中心
-        dcs = self.ovirt.connection.system_service().data_centers_service().list(
+        dcs = self.connection.system_service().data_centers_service().list(
             search=f"name={_sanitize_search_value(datacenter)}"
         )
         if not dcs:
             raise ValueError(f"数据中心不存在: {datacenter}")
 
-        clusters_service = self.ovirt.connection.system_service().clusters_service()
+        clusters_service = self.connection.system_service().clusters_service()
 
         # 检查是否已存在
         existing = clusters_service.list(search=f"name={_sanitize_search_value(name)}")
@@ -587,6 +551,7 @@ class ClusterMCP:
         except Exception as e:
             raise RuntimeError(f"创建集群失败: {e}")
 
+    @require_connection
     def update_cluster(self, name_or_id: str, new_name: str = None,
                       description: str = None,
                       threads_per_core: int = None) -> Dict[str, Any]:
@@ -601,14 +566,11 @@ class ClusterMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         cluster = self._find_cluster(name_or_id)
         if not cluster:
             raise ValueError(f"集群不存在: {name_or_id}")
 
-        clusters_service = self.ovirt.connection.system_service().clusters_service()
+        clusters_service = self.connection.system_service().clusters_service()
         cluster_service = clusters_service.cluster_service(cluster.id)
 
         if new_name:
@@ -624,6 +586,7 @@ class ClusterMCP:
         except Exception as e:
             raise RuntimeError(f"更新集群失败: {e}")
 
+    @require_connection
     def delete_cluster(self, name_or_id: str) -> Dict[str, Any]:
         """删除集群
 
@@ -633,14 +596,11 @@ class ClusterMCP:
         Returns:
             删除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         cluster = self._find_cluster(name_or_id)
         if not cluster:
             raise ValueError(f"集群不存在: {name_or_id}")
 
-        clusters_service = self.ovirt.connection.system_service().clusters_service()
+        clusters_service = self.connection.system_service().clusters_service()
         cluster_service = clusters_service.cluster_service(cluster.id)
 
         try:
@@ -651,8 +611,6 @@ class ClusterMCP:
 
     def list_cluster_hosts(self, name: str) -> List[Dict]:
         """列出集群主机"""
-        if not self.ovirt.connected: raise RuntimeError("未连接")
-
         hosts = self.ovirt.list_hosts(cluster=name)
         return hosts
 
@@ -697,6 +655,7 @@ class ClusterMCP:
 
     # ── CPU Profile 管理 ────────────────────────────────────────────────────
 
+    @require_connection
     def list_cpu_profiles(self, cluster: str) -> List[Dict]:
         """列出集群的 CPU Profile
 
@@ -706,14 +665,11 @@ class ClusterMCP:
         Returns:
             CPU Profile 列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         cluster_obj = self._find_cluster(cluster)
         if not cluster_obj:
             raise ValueError(f"集群不存在: {cluster}")
 
-        cluster_service = self.ovirt.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
+        cluster_service = self.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
         profiles_service = cluster_service.cpu_profiles_service()
 
         try:
@@ -732,6 +688,7 @@ class ClusterMCP:
             for p in profiles
         ]
 
+    @require_connection
     def get_cpu_profile(self, cluster: str, name_or_id: str) -> Optional[Dict]:
         """获取 CPU Profile 详情
 
@@ -742,14 +699,11 @@ class ClusterMCP:
         Returns:
             CPU Profile 详情
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         cluster_obj = self._find_cluster(cluster)
         if not cluster_obj:
             raise ValueError(f"集群不存在: {cluster}")
 
-        cluster_service = self.ovirt.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
+        cluster_service = self.connection.system_service().clusters_service().cluster_service(cluster_obj.id)
         profiles_service = cluster_service.cpu_profiles_service()
 
         try:
@@ -775,25 +729,24 @@ class ClusterMCP:
             }
 
 
-class TemplateMCP:
+class TemplateMCP(BaseMCP):
     """模板管理 MCP"""
-    
+
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
-    
+        super().__init__(ovirt_mcp)
+
     def list_templates(self, cluster: str = None) -> List[Dict]:
         """列出模板"""
         return self.ovirt.list_templates(cluster)
-    
+
+    @require_connection
     def get_template(self, name: str) -> Optional[Dict]:
         """获取模板详情"""
-        if not self.ovirt.connected: raise RuntimeError("未连接")
-        
-        templates = self.ovirt.connection.system_service().templates_service().list(search=f"name={_sanitize_search_value(name)}")
+        templates = self.connection.system_service().templates_service().list(search=f"name={_sanitize_search_value(name)}")
         if not templates: return None
-        
+
         t = templates[0]
-        
+
         # 获取磁盘信息
         disks = []
         try:
@@ -806,7 +759,7 @@ class TemplateMCP:
                 })
         except Exception as e:
             logger.debug(f"Failed to get template disk info: {e}")
-        
+
         return {
             "id": t.id,
             "name": t.name,
@@ -817,8 +770,8 @@ class TemplateMCP:
             "disks": disks,
             "creation_time": str(t.creation_time) if t.creation_time else ""
         }
-    
-    def create_vm_from_template(self, name: str, template: str, cluster: str, 
+
+    def create_vm_from_template(self, name: str, template: str, cluster: str,
                                 memory_mb: int = None, cpu_cores: int = None) -> Dict[str, Any]:
         """从模板创建 VM"""
         return self.ovirt.create_vm(
@@ -828,7 +781,7 @@ class TemplateMCP:
             cpu_cores=cpu_cores or 2,
             template=template
         )
-    
+
     def clone_template(self, name: str, new_name: str, cluster: str) -> Dict[str, Any]:
         """克隆模板"""
         # 先从模板创建 VM

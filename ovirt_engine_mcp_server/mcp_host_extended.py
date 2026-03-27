@@ -6,6 +6,8 @@ oVirt MCP Server - 主机扩展模块
 from typing import Dict, List, Any, Optional
 import logging
 
+from .base_mcp import BaseMCP
+from .decorators import require_connection
 from .search_utils import sanitize_search_value as _sanitize_search_value
 
 try:
@@ -16,30 +18,11 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class HostExtendedMCP:
+class HostExtendedMCP(BaseMCP):
     """主机扩展管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
-
-    def _find_host(self, name_or_id: str) -> Optional[Any]:
-        """查找主机（按名称或ID）"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        hosts_service = self.ovirt.connection.system_service().hosts_service()
-
-        # 先尝试按 ID 查找
-        try:
-            host = hosts_service.host_service(name_or_id).get()
-            if host:
-                return host
-        except Exception:
-            pass
-
-        # 按名称搜索
-        hosts = hosts_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return hosts[0] if hosts else None
+        super().__init__(ovirt_mcp)
 
     def get_host(self, name_or_id: str) -> Optional[Dict]:
         """获取主机详情"""
@@ -50,7 +33,7 @@ class HostExtendedMCP:
         # 获取主机网络接口
         nics = []
         try:
-            host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+            host_service = self.connection.system_service().hosts_service().host_service(host.id)
             nics_service = host_service.nics_service()
             nic_list = nics_service.list()
             nics = [
@@ -106,20 +89,18 @@ class HostExtendedMCP:
             "storage": storage,
         }
 
+    @require_connection
     def add_host(self, name: str, cluster: str, address: str,
                 password: str = None, ssh_port: int = 22) -> Dict[str, Any]:
         """添加主机"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 查找集群
-        clusters = self.ovirt.connection.system_service().clusters_service().list(
+        clusters = self.connection.system_service().clusters_service().list(
             search=f"name={_sanitize_search_value(cluster)}"
         )
         if not clusters:
             raise ValueError(f"集群不存在: {cluster}")
 
-        hosts_service = self.ovirt.connection.system_service().hosts_service()
+        hosts_service = self.connection.system_service().hosts_service()
 
         # 检查主机是否已存在
         existing = hosts_service.list(search=f"name={_sanitize_search_value(name)}")
@@ -148,16 +129,14 @@ class HostExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"添加主机失败: {e}")
 
+    @require_connection
     def remove_host(self, name_or_id: str, force: bool = False) -> Dict[str, Any]:
         """移除主机"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
 
         try:
             host_service.remove(force=force)
@@ -165,16 +144,14 @@ class HostExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"移除主机失败: {e}")
 
+    @require_connection
     def get_host_stats(self, name_or_id: str) -> Dict[str, Any]:
         """获取主机统计信息"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
         stats_service = host_service.statistics_service()
         stats = stats_service.list()
 
@@ -222,16 +199,14 @@ class HostExtendedMCP:
 
         return result
 
+    @require_connection
     def get_host_devices(self, name_or_id: str) -> List[Dict]:
         """获取主机设备列表"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
         devices_service = host_service.devices_service()
         devices = devices_service.list()
 
@@ -250,6 +225,7 @@ class HostExtendedMCP:
 
     # ── 主机网卡管理 ────────────────────────────────────────────────────────
 
+    @require_connection
     def list_host_nics(self, name_or_id: str) -> List[Dict]:
         """列出主机网卡
 
@@ -259,14 +235,11 @@ class HostExtendedMCP:
         Returns:
             网卡列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
         nics_service = host_service.nics_service()
 
         try:
@@ -291,6 +264,7 @@ class HostExtendedMCP:
             for n in nics
         ]
 
+    @require_connection
     def update_host_nic(self, name_or_id: str, nic_name: str,
                        custom_properties: Dict = None) -> Dict[str, Any]:
         """更新主机网卡配置
@@ -303,14 +277,11 @@ class HostExtendedMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
         nics_service = host_service.nics_service()
 
         # 查找网卡
@@ -341,6 +312,7 @@ class HostExtendedMCP:
 
     # ── 主机 NUMA 管理 ────────────────────────────────────────────────────────
 
+    @require_connection
     def get_host_numa(self, name_or_id: str) -> Dict[str, Any]:
         """获取主机 NUMA 拓扑
 
@@ -350,14 +322,11 @@ class HostExtendedMCP:
         Returns:
             NUMA 拓扑信息
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
         numa_service = host_service.numa_nodes_service()
 
         try:
@@ -388,6 +357,7 @@ class HostExtendedMCP:
 
     # ── 主机 Hook 管理 ────────────────────────────────────────────────────────
 
+    @require_connection
     def list_host_hooks(self, name_or_id: str) -> List[Dict]:
         """列出主机 Hook
 
@@ -397,14 +367,11 @@ class HostExtendedMCP:
         Returns:
             Hook 列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
         hooks_service = host_service.hooks_service()
 
         try:
@@ -426,6 +393,7 @@ class HostExtendedMCP:
 
     # ── 主机 Fence 操作 ──────────────────────────────────────────────────────
 
+    @require_connection
     def fence_host(self, name_or_id: str, action: str = "restart") -> Dict[str, Any]:
         """对主机执行 Fence 操作
 
@@ -436,9 +404,6 @@ class HostExtendedMCP:
         Returns:
             操作结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
@@ -447,7 +412,7 @@ class HostExtendedMCP:
         if action.lower() not in valid_actions:
             raise ValueError(f"无效操作: {action}，有效值: {valid_actions}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
 
         try:
             if action.lower() == "restart":
@@ -477,6 +442,7 @@ class HostExtendedMCP:
 
     # ── 主机网络配置 ────────────────────────────────────────────────────────
 
+    @require_connection
     def update_host_network(self, name_or_id: str, network: str,
                            nic: str = None, vlan_id: int = None,
                            bond: str = None) -> Dict[str, Any]:
@@ -492,20 +458,17 @@ class HostExtendedMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
         # 查找网络
-        networks_service = self.ovirt.connection.system_service().networks_service()
+        networks_service = self.connection.system_service().networks_service()
         networks = networks_service.list(search=f"name={_sanitize_search_value(network)}")
         if not networks:
             raise ValueError(f"网络不存在: {network}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
         network_service = host_service.networks_service()
 
         try:
@@ -528,6 +491,7 @@ class HostExtendedMCP:
 
     # ── 主机设备更新 ────────────────────────────────────────────────────────
 
+    @require_connection
     def update_host_device(self, name_or_id: str, device_name: str,
                           enabled: bool = True) -> Dict[str, Any]:
         """更新主机设备配置
@@ -540,14 +504,11 @@ class HostExtendedMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
         devices_service = host_service.devices_service()
 
         # 查找设备
@@ -571,6 +532,7 @@ class HostExtendedMCP:
 
     # ── 主机存储列表 ──────────────────────────────────────────────────────────
 
+    @require_connection
     def list_host_storage(self, name_or_id: str) -> List[Dict]:
         """列出主机存储
 
@@ -580,14 +542,11 @@ class HostExtendedMCP:
         Returns:
             存储列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
         storage_service = host_service.storage_service()
 
         try:
@@ -611,6 +570,7 @@ class HostExtendedMCP:
 
     # ── 主机安装 ──────────────────────────────────────────────────────────────
 
+    @require_connection
     def install_host(self, name_or_id: str, root_password: str = None,
                     ssh_key: str = None, override_iptables: bool = False) -> Dict[str, Any]:
         """安装/重新安装主机
@@ -624,14 +584,11 @@ class HostExtendedMCP:
         Returns:
             安装结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
 
         try:
             host_service.install(
@@ -650,6 +607,7 @@ class HostExtendedMCP:
 
     # ── iSCSI 发现和登录 ──────────────────────────────────────────────────────
 
+    @require_connection
     def iscsi_discover(self, name_or_id: str, address: str,
                       port: int = 3260, username: str = None,
                       password: str = None) -> Dict[str, Any]:
@@ -665,14 +623,11 @@ class HostExtendedMCP:
         Returns:
             发现的目标列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
 
         try:
             result = host_service.iscsi_discover(
@@ -703,6 +658,7 @@ class HostExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"iSCSI 发现失败: {e}")
 
+    @require_connection
     def iscsi_login(self, name_or_id: str, address: str, target: str,
                    port: int = 3260, username: str = None,
                    password: str = None) -> Dict[str, Any]:
@@ -719,14 +675,11 @@ class HostExtendedMCP:
         Returns:
             登录结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         host = self._find_host(name_or_id)
         if not host:
             raise ValueError(f"主机不存在: {name_or_id}")
 
-        host_service = self.ovirt.connection.system_service().hosts_service().host_service(host.id)
+        host_service = self.connection.system_service().hosts_service().host_service(host.id)
 
         try:
             host_service.iscsi_login(

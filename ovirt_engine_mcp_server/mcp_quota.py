@@ -6,6 +6,8 @@ oVirt MCP Server - Quota 管理模块
 from typing import Dict, List, Any, Optional
 import logging
 
+from .base_mcp import BaseMCP
+from .decorators import require_connection
 from .search_utils import sanitize_search_value as _sanitize_search_value
 
 try:
@@ -16,28 +18,11 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class QuotaMCP:
+class QuotaMCP(BaseMCP):
     """Quota 管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
-
-    def _find_datacenter(self, name_or_id: str) -> Optional[Any]:
-        """查找数据中心"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        dcs_service = self.ovirt.connection.system_service().data_centers_service()
-
-        try:
-            dc = dcs_service.data_center_service(name_or_id).get()
-            if dc:
-                return dc
-        except Exception:
-            pass
-
-        dcs = dcs_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return dcs[0] if dcs else None
+        super().__init__(ovirt_mcp)
 
     def _find_quota(self, datacenter: str, name_or_id: str) -> Optional[Any]:
         """查找配额"""
@@ -45,7 +30,7 @@ class QuotaMCP:
         if not dc:
             return None
 
-        dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+        dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
         quotas_service = dc_service.quotas_service()
 
         try:
@@ -58,6 +43,7 @@ class QuotaMCP:
         quotas = quotas_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
         return quotas[0] if quotas else None
 
+    @require_connection
     def list_quotas(self, datacenter: str) -> List[Dict]:
         """列出数据中心的配额
 
@@ -67,14 +53,11 @@ class QuotaMCP:
         Returns:
             配额列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         dc = self._find_datacenter(datacenter)
         if not dc:
             raise ValueError(f"数据中心不存在: {datacenter}")
 
-        dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+        dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
         quotas_service = dc_service.quotas_service()
 
         try:
@@ -95,6 +78,7 @@ class QuotaMCP:
             for q in quotas
         ]
 
+    @require_connection
     def get_quota(self, datacenter: str, name_or_id: str) -> Optional[Dict]:
         """获取配额详情
 
@@ -105,9 +89,6 @@ class QuotaMCP:
         Returns:
             配额详情
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         dc = self._find_datacenter(datacenter)
         if not dc:
             raise ValueError(f"数据中心不存在: {datacenter}")
@@ -144,6 +125,7 @@ class QuotaMCP:
             "storage_limits": storage_limits,
         }
 
+    @require_connection
     def create_quota(self, name: str, datacenter: str,
                     description: str = "",
                     cluster_hard_limit_pct: int = 0,
@@ -160,14 +142,11 @@ class QuotaMCP:
         Returns:
             创建结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         dc = self._find_datacenter(datacenter)
         if not dc:
             raise ValueError(f"数据中心不存在: {datacenter}")
 
-        dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+        dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
         quotas_service = dc_service.quotas_service()
 
         # 检查是否已存在
@@ -194,6 +173,7 @@ class QuotaMCP:
         except Exception as e:
             raise RuntimeError(f"创建配额失败: {e}")
 
+    @require_connection
     def update_quota(self, datacenter: str, name_or_id: str,
                     new_name: str = None, description: str = None,
                     cluster_hard_limit_pct: int = None,
@@ -211,9 +191,6 @@ class QuotaMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         dc = self._find_datacenter(datacenter)
         if not dc:
             raise ValueError(f"数据中心不存在: {datacenter}")
@@ -222,7 +199,7 @@ class QuotaMCP:
         if not quota:
             raise ValueError(f"配额不存在: {name_or_id}")
 
-        dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+        dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
         quotas_service = dc_service.quotas_service()
         quota_service = quotas_service.quota_service(quota.id)
 
@@ -241,6 +218,7 @@ class QuotaMCP:
         except Exception as e:
             raise RuntimeError(f"更新配额失败: {e}")
 
+    @require_connection
     def delete_quota(self, datacenter: str, name_or_id: str) -> Dict[str, Any]:
         """删除配额
 
@@ -251,9 +229,6 @@ class QuotaMCP:
         Returns:
             删除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         dc = self._find_datacenter(datacenter)
         if not dc:
             raise ValueError(f"数据中心不存在: {datacenter}")
@@ -262,7 +237,7 @@ class QuotaMCP:
         if not quota:
             raise ValueError(f"配额不存在: {name_or_id}")
 
-        dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+        dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
         quotas_service = dc_service.quotas_service()
         quota_service = quotas_service.quota_service(quota.id)
 
@@ -272,6 +247,7 @@ class QuotaMCP:
         except Exception as e:
             raise RuntimeError(f"删除配额失败: {e}")
 
+    @require_connection
     def list_quota_cluster_limits(self, datacenter: str, name_or_id: str) -> List[Dict]:
         """列出配额的集群限制
 
@@ -282,15 +258,12 @@ class QuotaMCP:
         Returns:
             集群限制列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         quota = self._find_quota(datacenter, name_or_id)
         if not quota:
             raise ValueError(f"配额不存在: {name_or_id}")
 
         dc = self._find_datacenter(datacenter)
-        dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+        dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
         quotas_service = dc_service.quotas_service()
         quota_service = quotas_service.quota_service(quota.id)
 
@@ -311,6 +284,7 @@ class QuotaMCP:
             for l in limits
         ]
 
+    @require_connection
     def list_quota_storage_limits(self, datacenter: str, name_or_id: str) -> List[Dict]:
         """列出配额的存储限制
 
@@ -321,15 +295,12 @@ class QuotaMCP:
         Returns:
             存储限制列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         quota = self._find_quota(datacenter, name_or_id)
         if not quota:
             raise ValueError(f"配额不存在: {name_or_id}")
 
         dc = self._find_datacenter(datacenter)
-        dc_service = self.ovirt.connection.system_service().data_centers_service().data_center_service(dc.id)
+        dc_service = self.connection.system_service().data_centers_service().data_center_service(dc.id)
         quotas_service = dc_service.quotas_service()
         quota_service = quotas_service.quota_service(quota.id)
 

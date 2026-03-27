@@ -6,6 +6,9 @@ oVirt MCP Server - 系统管理模块
 from typing import Dict, List, Any, Optional
 import logging
 
+from .base_mcp import BaseMCP
+from .decorators import require_connection
+
 try:
     import ovirtsdk4 as sdk
 except ImportError:
@@ -14,23 +17,21 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class SystemMCP:
+class SystemMCP(BaseMCP):
     """系统管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
+        super().__init__(ovirt_mcp)
 
+    @require_connection
     def get_system_info(self) -> Dict[str, Any]:
         """获取系统信息
 
         Returns:
             系统信息
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         try:
-            system_service = self.ovirt.connection.system_service()
+            system_service = self.connection.system_service()
             api = system_service.get()
 
             # 获取版本信息
@@ -81,6 +82,7 @@ class SystemMCP:
         except Exception as e:
             raise RuntimeError(f"获取系统信息失败: {e}")
 
+    @require_connection
     def list_system_options(self, category: str = None) -> List[Dict]:
         """列出系统选项
 
@@ -90,11 +92,8 @@ class SystemMCP:
         Returns:
             系统选项列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         try:
-            system_service = self.ovirt.connection.system_service()
+            system_service = self.connection.system_service()
             options_service = system_service.system_options_service()
 
             if category:
@@ -119,6 +118,7 @@ class SystemMCP:
 
     # ── 任务管理 ────────────────────────────────────────────────────────────
 
+    @require_connection
     def list_jobs(self, page: int = 1, page_size: int = 50) -> List[Dict]:
         """列出任务
 
@@ -129,11 +129,8 @@ class SystemMCP:
         Returns:
             任务列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         try:
-            jobs_service = self.ovirt.connection.system_service().jobs_service()
+            jobs_service = self.connection.system_service().jobs_service()
             jobs = jobs_service.list(max=page * page_size)
 
             # 分页
@@ -158,6 +155,7 @@ class SystemMCP:
             for j in jobs
         ]
 
+    @require_connection
     def get_job(self, job_id: str) -> Optional[Dict]:
         """获取任务详情
 
@@ -167,11 +165,8 @@ class SystemMCP:
         Returns:
             任务详情
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         try:
-            jobs_service = self.ovirt.connection.system_service().jobs_service()
+            jobs_service = self.connection.system_service().jobs_service()
             job = jobs_service.job_service(job_id).get()
 
             # 获取任务步骤
@@ -213,6 +208,7 @@ class SystemMCP:
             logger.debug(f"获取任务失败: {e}")
             return None
 
+    @require_connection
     def cancel_job(self, job_id: str, force: bool = False) -> Dict[str, Any]:
         """取消任务
 
@@ -223,11 +219,8 @@ class SystemMCP:
         Returns:
             取消结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         try:
-            jobs_service = self.ovirt.connection.system_service().jobs_service()
+            jobs_service = self.connection.system_service().jobs_service()
             job_service = jobs_service.job_service(job_id)
 
             job_service.cancel(force=force)
@@ -242,17 +235,15 @@ class SystemMCP:
 
     # ── 系统统计 ────────────────────────────────────────────────────────────
 
+    @require_connection
     def get_system_statistics(self) -> Dict[str, Any]:
         """获取系统统计信息
 
         Returns:
             系统统计信息
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         try:
-            system_service = self.ovirt.connection.system_service()
+            system_service = self.connection.system_service()
             statistics_service = system_service.statistics_service()
 
             stats = statistics_service.list()

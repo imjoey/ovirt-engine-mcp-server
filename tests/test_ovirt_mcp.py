@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 from datetime import datetime
 
-from src.config import Config
+from ovirt_engine_mcp_server.config import Config
 
 
 @pytest.fixture
@@ -81,16 +81,16 @@ class TestOvirtMCPConnection:
     """Tests for OvirtMCP connection handling."""
 
     def test_init_with_config(self, mock_config):
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mcp = OvirtMCP(mock_config)
         assert mcp.config == mock_config
         assert mcp.connection is None
         assert mcp.connected is False
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_connect_success(self, mock_conn_class, mock_config):
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_conn = MagicMock()
         mock_conn.test.return_value = True
@@ -102,9 +102,9 @@ class TestOvirtMCPConnection:
         assert result is True
         assert mcp.connected is True
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_connect_failure(self, mock_conn_class, mock_config):
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_conn_class.side_effect = Exception("Connection refused")
 
@@ -114,9 +114,9 @@ class TestOvirtMCPConnection:
         assert result is False
         assert mcp.connected is False
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_is_connected(self, mock_conn_class, mock_config):
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_conn = MagicMock()
         mock_conn.test.return_value = True
@@ -128,9 +128,9 @@ class TestOvirtMCPConnection:
         mcp.connect()
         assert mcp.is_connected() is True
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_disconnect(self, mock_conn_class, mock_config):
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_conn = MagicMock()
         mock_conn.test.return_value = True
@@ -147,9 +147,9 @@ class TestOvirtMCPConnection:
 class TestOvirtMCPVMOperations:
     """Tests for VM-related operations."""
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_list_vms_empty(self, mock_conn_class, mock_config):
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_conn = MagicMock()
         mock_conn.test.return_value = True
@@ -162,9 +162,9 @@ class TestOvirtMCPVMOperations:
         mcp.connect()
         assert mcp.list_vms() == []
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_list_vms_with_data(self, mock_conn_class, mock_config):
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_conn = MagicMock()
@@ -181,9 +181,9 @@ class TestOvirtMCPVMOperations:
         assert len(vms) == 1
         assert vms[0].name == "test-vm"
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_start_vm_success(self, mock_conn_class, mock_config):
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_conn = MagicMock()
@@ -206,9 +206,9 @@ class TestOvirtMCPVMOperations:
         assert result["success"] is True
         mock_vm_service.start.assert_called_once()
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_start_vm_not_found(self, mock_conn_class, mock_config):
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_conn = MagicMock()
         mock_conn.test.return_value = True
@@ -225,10 +225,10 @@ class TestOvirtMCPVMOperations:
         with pytest.raises(ValueError, match="VM not found"):
             mcp.start_vm("nonexistent")
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_stop_vm_graceful(self, mock_conn_class, mock_config):
         """测试优雅关闭 VM (shutdown)"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_conn = MagicMock()
@@ -250,10 +250,10 @@ class TestOvirtMCPVMOperations:
         assert result["success"] is True
         mock_vm_service.shutdown.assert_called_once()
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_stop_vm_force(self, mock_conn_class, mock_config):
         """测试强制关闭 VM (stop)"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_conn = MagicMock()
@@ -275,10 +275,10 @@ class TestOvirtMCPVMOperations:
         assert result["success"] is True
         mock_vm_service.stop.assert_called_once()
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_restart_vm(self, mock_conn_class, mock_config):
         """测试重启 VM"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_conn = MagicMock()
@@ -299,10 +299,10 @@ class TestOvirtMCPVMOperations:
         assert result["success"] is True
         mock_vm_service.reboot.assert_called_once()
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_delete_vm(self, mock_conn_class, mock_config):
         """测试删除 VM"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm(status="down")
         mock_conn = MagicMock()
@@ -324,10 +324,10 @@ class TestOvirtMCPVMOperations:
         assert result["success"] is True
         mock_vm_service.remove.assert_called_once()
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_update_vm_resources(self, mock_conn_class, mock_config):
         """测试更新 VM 资源"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_conn = MagicMock()
@@ -349,10 +349,10 @@ class TestOvirtMCPVMOperations:
         assert result["success"] is True
         mock_vm_service.update.assert_called_once()
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_create_vm_success(self, mock_conn_class, mock_config):
         """测试创建 VM 成功"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_conn = MagicMock()
         mock_conn.test.return_value = True
@@ -408,10 +408,10 @@ class TestOvirtMCPVMOperations:
 class TestOvirtMCPSnapshotOperations:
     """Tests for snapshot-related operations."""
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_list_snapshots(self, mock_conn_class, mock_config):
         """测试列出快照"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_snapshot = _create_mock_snapshot()
@@ -435,10 +435,10 @@ class TestOvirtMCPSnapshotOperations:
         assert len(snapshots) == 1
         assert snapshots[0].id == "snap-123"
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_create_snapshot(self, mock_conn_class, mock_config):
         """测试创建快照"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_conn = MagicMock()
@@ -459,10 +459,10 @@ class TestOvirtMCPSnapshotOperations:
         assert result["success"] is True
         mock_snapshots_service.add.assert_called_once()
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_restore_snapshot(self, mock_conn_class, mock_config):
         """测试恢复快照"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm(status="down")
         mock_conn = MagicMock()
@@ -486,10 +486,10 @@ class TestOvirtMCPSnapshotOperations:
         assert result["success"] is True
         mock_snapshot_service.restore.assert_called_once()
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_delete_snapshot(self, mock_conn_class, mock_config):
         """测试删除快照"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_conn = MagicMock()
@@ -514,10 +514,10 @@ class TestOvirtMCPSnapshotOperations:
 class TestOvirtMCPDiskOperations:
     """Tests for disk-related operations."""
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_attach_disk(self, mock_conn_class, mock_config):
         """测试附加磁盘"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_conn = MagicMock()
@@ -542,10 +542,10 @@ class TestOvirtMCPDiskOperations:
 class TestOvirtMCPNetworkOperations:
     """Tests for network-related operations."""
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_list_networks(self, mock_conn_class, mock_config):
         """测试列出网络"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_network = MagicMock()
         mock_network.id = "net-123"
@@ -572,10 +572,10 @@ class TestOvirtMCPNetworkOperations:
         assert len(networks) == 1
         assert networks[0]["name"] == "ovirtmgmt"
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_get_network(self, mock_conn_class, mock_config):
         """测试获取网络详情"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_network = MagicMock()
         mock_network.id = "net-123"
@@ -606,10 +606,10 @@ class TestOvirtMCPNetworkOperations:
         assert network is not None
         assert network["name"] == "ovirtmgmt"
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_create_network(self, mock_conn_class, mock_config):
         """测试创建网络"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_network = MagicMock()
         mock_network.id = "net-456"
@@ -634,9 +634,9 @@ class TestOvirtMCPNetworkOperations:
 class TestOvirtMCPHostOperations:
     """Tests for host-related operations."""
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_list_hosts_empty(self, mock_conn_class, mock_config):
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_conn = MagicMock()
         mock_conn.test.return_value = True
@@ -649,10 +649,10 @@ class TestOvirtMCPHostOperations:
         mcp.connect()
         assert mcp.list_hosts() == []
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_list_hosts_with_data(self, mock_conn_class, mock_config):
         """测试列出主机"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_host = MagicMock()
         mock_host.id = "host-123"
@@ -689,10 +689,10 @@ class TestOvirtMCPHostOperations:
 class TestOvirtMCPBackupOperations:
     """Tests for backup-related operations."""
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_create_backup_stub(self, mock_conn_class, mock_config):
         """测试创建备份（存根实现）"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_conn = MagicMock()
@@ -714,10 +714,10 @@ class TestOvirtMCPBackupOperations:
         assert result["success"] is True
         assert result["stub"] is True  # 使用存根实现
 
-    @patch("src.ovirt_mcp.Connection")
+    @patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
     def test_restore_backup_stub(self, mock_conn_class, mock_config):
         """测试恢复备份（存根实现）"""
-        from src.ovirt_mcp import OvirtMCP
+        from ovirt_engine_mcp_server.ovirt_mcp import OvirtMCP
 
         mock_vm = _create_mock_vm()
         mock_conn = MagicMock()
@@ -743,29 +743,29 @@ class TestValidation:
     """Tests for input validation."""
 
     def test_validate_name_ok(self):
-        from src.validation import validate_name
+        from ovirt_engine_mcp_server.validation import validate_name
         assert validate_name("test-vm") == "test-vm"
 
     def test_validate_name_empty(self):
-        from src.validation import validate_name, ValidationError
+        from ovirt_engine_mcp_server.validation import validate_name, ValidationError
         with pytest.raises(ValidationError):
             validate_name("")
 
     def test_validate_name_or_id(self):
-        from src.validation import validate_name_or_id
+        from ovirt_engine_mcp_server.validation import validate_name_or_id
         assert validate_name_or_id("vm-123") == "vm-123"
 
     def test_validate_positive_int(self):
-        from src.validation import validate_positive_int
+        from ovirt_engine_mcp_server.validation import validate_positive_int
         assert validate_positive_int(4096, "memory") == 4096
 
     def test_validate_positive_int_too_small(self):
-        from src.validation import validate_positive_int, ValidationError
+        from ovirt_engine_mcp_server.validation import validate_positive_int, ValidationError
         with pytest.raises(ValidationError):
             validate_positive_int(0, "memory", min_val=1)
 
     def test_validate_tool_args_no_rules(self):
-        from src.validation import validate_tool_args
+        from ovirt_engine_mcp_server.validation import validate_tool_args
         args = {"name_or_id": "test"}
         assert validate_tool_args("vm_start", args) == args
 
@@ -774,24 +774,24 @@ class TestErrors:
     """Tests for error types."""
 
     def test_ovirt_mcp_error(self):
-        from src.errors import OvirtMCPError
+        from ovirt_engine_mcp_server.errors import OvirtMCPError
         err = OvirtMCPError("test", code="TEST", retryable=True)
         assert err.code == "TEST"
         assert err.retryable is True
         assert err.to_dict()["error"] is True
 
     def test_connection_error(self):
-        from src.errors import OvirtConnectionError
+        from ovirt_engine_mcp_server.errors import OvirtConnectionError
         err = OvirtConnectionError()
         assert err.code == "CONNECTION_ERROR"
         assert err.retryable is True
 
     def test_not_found_error(self):
-        from src.errors import NotFoundError
+        from ovirt_engine_mcp_server.errors import NotFoundError
         err = NotFoundError("not here")
         assert err.retryable is False
 
     def test_timeout_error(self):
-        from src.errors import OvirtTimeoutError
+        from ovirt_engine_mcp_server.errors import OvirtTimeoutError
         err = OvirtTimeoutError()
         assert err.retryable is True

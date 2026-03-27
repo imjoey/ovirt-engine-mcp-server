@@ -42,7 +42,8 @@ dev = [
     "ruff>=0.1.0",
 ]
 
-ovirt_engine_mcp_server.server:main
+[project.scripts]
+ovirt-mcp-server = "ovirt_engine_mcp_server.server:main"
 
 [project.urls]
 Homepage = "https://github.com/imjoey/ovirt-engine-mcp-server"

@@ -46,7 +46,7 @@ class TestDataCenterMCPList:
 
     def test_list_datacenters_empty(self):
         """测试空数据中心列表"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -61,7 +61,7 @@ class TestDataCenterMCPList:
 
     def test_list_datacenters_with_data(self):
         """测试有数据的数据中心列表"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
 
         mock_dc = _create_mock_datacenter()
         mock_ovirt = MagicMock()
@@ -80,14 +80,15 @@ class TestDataCenterMCPList:
 
     def test_list_datacenters_not_connected(self):
         """测试未连接时抛出异常"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.errors import OvirtConnectionError
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = False
 
         dc_mcp = DataCenterMCP(mock_ovirt)
 
-        with pytest.raises(RuntimeError, match="未连接"):
+        with pytest.raises(OvirtConnectionError):
             dc_mcp.list_datacenters()
 
 
@@ -96,7 +97,7 @@ class TestDataCenterMCPGet:
 
     def test_get_datacenter_by_id(self):
         """测试通过 ID 获取数据中心"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
 
         mock_dc = _create_mock_datacenter()
         mock_cluster = _create_mock_cluster()
@@ -129,7 +130,7 @@ class TestDataCenterMCPGet:
 
     def test_get_datacenter_not_found(self):
         """测试数据中心不存在"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -151,7 +152,7 @@ class TestDataCenterMCPCreate:
 
     def test_create_datacenter_success(self):
         """测试创建数据中心成功"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
 
         mock_dc = _create_mock_datacenter(name="NewDC")
 
@@ -173,7 +174,7 @@ class TestDataCenterMCPCreate:
 
     def test_create_datacenter_already_exists(self):
         """测试创建已存在的数据中心"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
 
         mock_dc = _create_mock_datacenter()
 
@@ -192,7 +193,7 @@ class TestDataCenterMCPCreate:
 
     def test_create_datacenter_invalid_storage_type(self):
         """测试无效的存储类型"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -208,7 +209,7 @@ class TestDataCenterMCPUpdate:
 
     def test_update_datacenter_success(self):
         """测试更新数据中心成功"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
 
         mock_dc = _create_mock_datacenter()
         mock_dc_service = MagicMock()
@@ -229,7 +230,7 @@ class TestDataCenterMCPUpdate:
 
     def test_update_datacenter_not_found(self):
         """测试更新不存在的数据中心"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -251,7 +252,7 @@ class TestDataCenterMCPDelete:
 
     def test_delete_datacenter_success(self):
         """测试删除数据中心成功"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
 
         mock_dc = _create_mock_datacenter()
         mock_dc_service = MagicMock()
@@ -273,7 +274,7 @@ class TestDataCenterMCPDelete:
 
     def test_delete_datacenter_not_found(self):
         """测试删除不存在的数据中心"""
-        from src.mcp_datacenter import DataCenterMCP
+        from ovirt_engine_mcp_server.mcp_datacenter import DataCenterMCP
 
         mock_ovirt = MagicMock()
         mock_ovirt.connected = True
@@ -295,7 +296,7 @@ class TestDataCenterMCPTools:
 
     def test_mcp_tools_defined(self):
         """测试 MCP 工具注册表已定义"""
-        from src.mcp_datacenter import MCP_TOOLS
+        from ovirt_engine_mcp_server.mcp_datacenter import MCP_TOOLS
 
         expected_tools = [
             "datacenter_list",

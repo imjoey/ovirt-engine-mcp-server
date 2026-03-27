@@ -6,6 +6,8 @@ oVirt MCP Server - 模板扩展模块
 from typing import Dict, List, Any, Optional
 import logging
 
+from .base_mcp import BaseMCP
+from .decorators import require_connection
 from .search_utils import sanitize_search_value as _sanitize_search_value
 
 try:
@@ -16,43 +18,13 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class TemplateExtendedMCP:
+class TemplateExtendedMCP(BaseMCP):
     """模板扩展管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
+        super().__init__(ovirt_mcp)
 
-    def _find_template(self, name_or_id: str) -> Optional[Any]:
-        """查找模板（按名称或 ID）"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        templates_service = self.ovirt.connection.system_service().templates_service()
-
-        try:
-            template = templates_service.template_service(name_or_id).get()
-            if template:
-                return template
-        except Exception:
-            pass
-
-        templates = templates_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return templates[0] if templates else None
-
-    def _find_cluster(self, name_or_id: str) -> Optional[Any]:
-        """查找集群"""
-        clusters_service = self.ovirt.connection.system_service().clusters_service()
-
-        try:
-            cluster = clusters_service.cluster_service(name_or_id).get()
-            if cluster:
-                return cluster
-        except Exception:
-            pass
-
-        clusters = clusters_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return clusters[0] if clusters else None
-
+    @require_connection
     def get_template(self, name_or_id: str) -> Optional[Dict]:
         """获取模板详情
 
@@ -62,9 +34,6 @@ class TemplateExtendedMCP:
         Returns:
             模板详情
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         template = self._find_template(name_or_id)
         if not template:
             return None
@@ -120,6 +89,7 @@ class TemplateExtendedMCP:
             "bios_type": str(template.bios.type.value) if template.bios else "",
         }
 
+    @require_connection
     def create_template(self, name: str, vm: str, description: str = "",
                        cluster: str = None) -> Dict[str, Any]:
         """从虚拟机创建模板
@@ -133,20 +103,12 @@ class TemplateExtendedMCP:
         Returns:
             创建结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         # 查找 VM
-        vms_service = self.ovirt.connection.system_service().vms_service()
-        vm_obj = None
-        try:
-            vm_obj = vms_service.vm_service(vm).get()
-        except Exception:
-            vms = vms_service.list(search=f"name={_sanitize_search_value(vm)}")
-            if not vms:
-                raise ValueError(f"VM 不存在: {vm}")
-            vm_obj = vms[0]
+        vm_obj = self._find_vm(vm)
+        if not vm_obj:
+            raise ValueError(f"VM 不存在: {vm}")
 
+        vms_service = self.connection.system_service().vms_service()
         vm_service = vms_service.vm_service(vm_obj.id)
 
         # 构建模板
@@ -172,6 +134,7 @@ class TemplateExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"创建模板失败: {e}")
 
+    @require_connection
     def delete_template(self, name_or_id: str, force: bool = False) -> Dict[str, Any]:
         """删除模板
 
@@ -182,9 +145,6 @@ class TemplateExtendedMCP:
         Returns:
             删除结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         template = self._find_template(name_or_id)
         if not template:
             raise ValueError(f"模板不存在: {name_or_id}")
@@ -193,7 +153,7 @@ class TemplateExtendedMCP:
         if template.name.lower() == "blank":
             raise ValueError("不能删除 Blank 模板")
 
-        templates_service = self.ovirt.connection.system_service().templates_service()
+        templates_service = self.connection.system_service().templates_service()
         template_service = templates_service.template_service(template.id)
 
         try:
@@ -202,6 +162,7 @@ class TemplateExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"删除模板失败: {e}")
 
+    @require_connection
     def update_template(self, name_or_id: str, new_name: str = None,
                        description: str = None, memory_mb: int = None,
                        cpu_cores: int = None) -> Dict[str, Any]:
@@ -217,14 +178,11 @@ class TemplateExtendedMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         template = self._find_template(name_or_id)
         if not template:
             raise ValueError(f"模板不存在: {name_or_id}")
 
-        templates_service = self.ovirt.connection.system_service().templates_service()
+        templates_service = self.connection.system_service().templates_service()
         template_service = templates_service.template_service(template.id)
 
         # 更新属性
@@ -243,6 +201,7 @@ class TemplateExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"更新模板失败: {e}")
 
+    @require_connection
     def list_template_disks(self, name_or_id: str) -> List[Dict]:
         """列出模板的磁盘
 
@@ -252,9 +211,6 @@ class TemplateExtendedMCP:
         Returns:
             磁盘列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         template = self._find_template(name_or_id)
         if not template:
             raise ValueError(f"模板不存在: {name_or_id}")
@@ -279,6 +235,7 @@ class TemplateExtendedMCP:
 
         return disks
 
+    @require_connection
     def list_template_nics(self, name_or_id: str) -> List[Dict]:
         """列出模板的网卡
 
@@ -288,9 +245,6 @@ class TemplateExtendedMCP:
         Returns:
             网卡列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         template = self._find_template(name_or_id)
         if not template:
             raise ValueError(f"模板不存在: {name_or_id}")
@@ -317,16 +271,14 @@ class TemplateExtendedMCP:
 
     # ── Instance Type 管理 ──────────────────────────────────────────────────
 
+    @require_connection
     def list_instance_types(self) -> List[Dict]:
         """列出实例类型
 
         Returns:
             实例类型列表
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        instance_types_service = self.ovirt.connection.system_service().instance_types_service()
+        instance_types_service = self.connection.system_service().instance_types_service()
 
         try:
             types = instance_types_service.list()
@@ -346,6 +298,7 @@ class TemplateExtendedMCP:
             for t in types
         ]
 
+    @require_connection
     def get_instance_type(self, name_or_id: str) -> Optional[Dict]:
         """获取实例类型详情
 
@@ -355,10 +308,7 @@ class TemplateExtendedMCP:
         Returns:
             实例类型详情
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        instance_types_service = self.ovirt.connection.system_service().instance_types_service()
+        instance_types_service = self.connection.system_service().instance_types_service()
 
         # 尝试按 ID 获取
         try:

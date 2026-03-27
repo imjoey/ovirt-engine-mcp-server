@@ -6,6 +6,8 @@ oVirt MCP Server - 磁盘扩展模块
 from typing import Dict, List, Any, Optional
 import logging
 
+from .base_mcp import BaseMCP
+from .decorators import require_connection
 from .search_utils import sanitize_search_value as _sanitize_search_value
 
 try:
@@ -16,44 +18,11 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class DiskExtendedMCP:
+class DiskExtendedMCP(BaseMCP):
     """磁盘扩展管理 MCP"""
 
     def __init__(self, ovirt_mcp):
-        self.ovirt = ovirt_mcp
-
-    def _find_disk(self, name_or_id: str) -> Optional[Any]:
-        """查找磁盘（按名称或ID）"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
-        disks_service = self.ovirt.connection.system_service().disks_service()
-
-        # 先尝试按 ID 查找
-        try:
-            disk = disks_service.disk_service(name_or_id).get()
-            if disk:
-                return disk
-        except Exception:
-            pass
-
-        # 按名称搜索
-        disks = disks_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return disks[0] if disks else None
-
-    def _find_vm(self, name_or_id: str) -> Optional[Any]:
-        """查找虚拟机"""
-        vms_service = self.ovirt.connection.system_service().vms_service()
-
-        try:
-            vm = vms_service.vm_service(name_or_id).get()
-            if vm:
-                return vm
-        except Exception:
-            pass
-
-        vms = vms_service.list(search=f"name={_sanitize_search_value(name_or_id)}")
-        return vms[0] if vms else None
+        super().__init__(ovirt_mcp)
 
     def get_disk(self, name_or_id: str) -> Optional[Dict]:
         """获取磁盘详情"""
@@ -64,13 +33,13 @@ class DiskExtendedMCP:
         # 获取磁盘附加信息
         attachments = []
         try:
-            disk_service = self.ovirt.connection.system_service().disks_service().disk_service(disk.id)
+            disk_service = self.connection.system_service().disks_service().disk_service(disk.id)
             attachments_service = disk_service.disk_attachments_service() if hasattr(disk_service, 'disk_attachments_service') else None
 
             # 通过全局磁盘附件服务查找
-            all_attachments = self.ovirt.connection.system_service().disk_attachments_service().list(
+            all_attachments = self.connection.system_service().disk_attachments_service().list(
                 search=f"disk_id={disk.id}"
-            ) if hasattr(self.ovirt.connection.system_service(), 'disk_attachments_service') else []
+            ) if hasattr(self.connection.system_service(), 'disk_attachments_service') else []
 
             for att in all_attachments:
                 attachments.append({
@@ -103,11 +72,9 @@ class DiskExtendedMCP:
             "attachments": attachments[:10],  # 限制数量
         }
 
+    @require_connection
     def delete_disk(self, name_or_id: str, force: bool = False) -> Dict[str, Any]:
         """删除磁盘"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         disk = self._find_disk(name_or_id)
         if not disk:
             raise ValueError(f"磁盘不存在: {name_or_id}")
@@ -116,7 +83,7 @@ class DiskExtendedMCP:
         if disk.status and disk.status.value != "ok" and not force:
             raise RuntimeError(f"磁盘状态异常: {disk.status.value}，使用 force=True 强制删除")
 
-        disk_service = self.ovirt.connection.system_service().disks_service().disk_service(disk.id)
+        disk_service = self.connection.system_service().disks_service().disk_service(disk.id)
 
         try:
             disk_service.remove()
@@ -124,11 +91,9 @@ class DiskExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"删除磁盘失败: {e}")
 
+    @require_connection
     def resize_disk(self, name_or_id: str, new_size_gb: int) -> Dict[str, Any]:
         """调整磁盘大小"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         if new_size_gb <= 0:
             raise ValueError("磁盘大小必须大于 0")
 
@@ -142,7 +107,7 @@ class DiskExtendedMCP:
         if new_size_gb < current_size_gb:
             raise ValueError(f"不能缩小磁盘: 当前 {current_size_gb}GB，请求 {new_size_gb}GB")
 
-        disk_service = self.ovirt.connection.system_service().disks_service().disk_service(disk.id)
+        disk_service = self.connection.system_service().disks_service().disk_service(disk.id)
 
         try:
             # 更新磁盘大小
@@ -161,11 +126,9 @@ class DiskExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"调整磁盘大小失败: {e}")
 
+    @require_connection
     def detach_disk(self, name_or_id: str, vm_name_or_id: str) -> Dict[str, Any]:
         """从虚拟机分离磁盘"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         disk = self._find_disk(name_or_id)
         if not disk:
             raise ValueError(f"磁盘不存在: {name_or_id}")
@@ -176,7 +139,7 @@ class DiskExtendedMCP:
 
         try:
             # 获取 VM 的磁盘附件
-            vm_service = self.ovirt.connection.system_service().vms_service().vm_service(vm.id)
+            vm_service = self.connection.system_service().vms_service().vm_service(vm.id)
             attachments_service = vm_service.disk_attachments_service()
             attachments = attachments_service.list()
 
@@ -203,23 +166,21 @@ class DiskExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"分离磁盘失败: {e}")
 
+    @require_connection
     def move_disk(self, name_or_id: str, target_storage_domain: str) -> Dict[str, Any]:
         """移动磁盘到另一个存储域"""
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         disk = self._find_disk(name_or_id)
         if not disk:
             raise ValueError(f"磁盘不存在: {name_or_id}")
 
         # 查找目标存储域
-        sds = self.ovirt.connection.system_service().storage_domains_service().list(
+        sds = self.connection.system_service().storage_domains_service().list(
             search=f"name={_sanitize_search_value(target_storage_domain)}"
         )
         if not sds:
             raise ValueError(f"存储域不存在: {target_storage_domain}")
 
-        disk_service = self.ovirt.connection.system_service().disks_service().disk_service(disk.id)
+        disk_service = self.connection.system_service().disks_service().disk_service(disk.id)
 
         try:
             # 执行移动操作
@@ -254,6 +215,7 @@ class DiskExtendedMCP:
             "sparse": disk.sparse if hasattr(disk, 'sparse') else True,
         }
 
+    @require_connection
     def update_disk(self, name_or_id: str, new_name: str = None,
                    description: str = None, shareable: bool = None,
                    wipe_after_delete: bool = None) -> Dict[str, Any]:
@@ -269,14 +231,11 @@ class DiskExtendedMCP:
         Returns:
             更新结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         disk = self._find_disk(name_or_id)
         if not disk:
             raise ValueError(f"磁盘不存在: {name_or_id}")
 
-        disk_service = self.ovirt.connection.system_service().disks_service().disk_service(disk.id)
+        disk_service = self.connection.system_service().disks_service().disk_service(disk.id)
 
         if new_name:
             disk.name = new_name
@@ -293,6 +252,7 @@ class DiskExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"更新磁盘失败: {e}")
 
+    @require_connection
     def sparsify_disk(self, name_or_id: str) -> Dict[str, Any]:
         """精简磁盘（消除空白块）
 
@@ -302,9 +262,6 @@ class DiskExtendedMCP:
         Returns:
             操作结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         disk = self._find_disk(name_or_id)
         if not disk:
             raise ValueError(f"磁盘不存在: {name_or_id}")
@@ -313,7 +270,7 @@ class DiskExtendedMCP:
         if disk.format and disk.format.value != "cow":
             raise ValueError("只有 COW 格式的磁盘支持精简操作")
 
-        disk_service = self.ovirt.connection.system_service().disks_service().disk_service(disk.id)
+        disk_service = self.connection.system_service().disks_service().disk_service(disk.id)
 
         try:
             disk_service.sparsify()
@@ -325,6 +282,7 @@ class DiskExtendedMCP:
         except Exception as e:
             raise RuntimeError(f"精简磁盘失败: {e}")
 
+    @require_connection
     def export_disk(self, name_or_id: str, export_domain: str) -> Dict[str, Any]:
         """导出磁盘到导出域
 
@@ -335,15 +293,12 @@ class DiskExtendedMCP:
         Returns:
             导出结果
         """
-        if not self.ovirt.connected:
-            raise RuntimeError("未连接到 oVirt")
-
         disk = self._find_disk(name_or_id)
         if not disk:
             raise ValueError(f"磁盘不存在: {name_or_id}")
 
         # 查找导出域
-        sds = self.ovirt.connection.system_service().storage_domains_service().list(
+        sds = self.connection.system_service().storage_domains_service().list(
             search=f"name={_sanitize_search_value(export_domain)}"
         )
         if not sds:
@@ -353,7 +308,7 @@ class DiskExtendedMCP:
         if sds[0].type and sds[0].type.value != "export":
             raise ValueError(f"存储域 {export_domain} 不是导出域")
 
-        disk_service = self.ovirt.connection.system_service().disks_service().disk_service(disk.id)
+        disk_service = self.connection.system_service().disks_service().disk_service(disk.id)
 
         try:
             disk_service.export(

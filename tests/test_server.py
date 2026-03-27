@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from src.config import Config
+from ovirt_engine_mcp_server.config import Config
 
 
 @pytest.fixture
@@ -23,12 +23,12 @@ except ImportError:
 
 
 @pytest.mark.skipif(not MCP_AVAILABLE, reason="mcp module not installed")
-@patch("src.ovirt_mcp.Connection")
+@patch("ovirt_engine_mcp_server.ovirt_mcp.Connection")
 class TestOvirtMCPServer:
     """Tests for the MCP server."""
 
     def test_tool_registration(self, mock_conn_class, mock_config):
-        from src.server import OvirtMCPServer
+        from ovirt_engine_mcp_server.server import OvirtMCPServer
 
         mock_conn = MagicMock()
         mock_conn.test.return_value = True
@@ -39,7 +39,7 @@ class TestOvirtMCPServer:
         assert len(server.tool_handlers) > 20
 
     def test_core_tools_present(self, mock_conn_class, mock_config):
-        from src.server import OvirtMCPServer
+        from ovirt_engine_mcp_server.server import OvirtMCPServer
 
         mock_conn = MagicMock()
         mock_conn.test.return_value = True
@@ -56,7 +56,7 @@ class TestOvirtMCPServer:
             assert tool in server.tool_handlers, f"Missing tool: {tool}"
 
     def test_all_tools_have_descriptions(self, mock_conn_class, mock_config):
-        from src.server import OvirtMCPServer
+        from ovirt_engine_mcp_server.server import OvirtMCPServer
 
         mock_conn = MagicMock()
         mock_conn.test.return_value = True
@@ -69,7 +69,7 @@ class TestOvirtMCPServer:
                 f"Tool {tool_name} missing description"
 
     def test_all_tools_have_schemas(self, mock_conn_class, mock_config):
-        from src.server import OvirtMCPServer, TOOL_SCHEMAS, DEFAULT_SCHEMA
+        from ovirt_engine_mcp_server.server import OvirtMCPServer, TOOL_SCHEMAS, DEFAULT_SCHEMA
 
         mock_conn = MagicMock()
         mock_conn.test.return_value = True
@@ -83,25 +83,25 @@ class TestOvirtMCPServer:
             assert "properties" in schema
 
     def test_format_result_none(self, mock_conn_class, mock_config):
-        from src.server import OvirtMCPServer
+        from ovirt_engine_mcp_server.server import OvirtMCPServer
 
         result = OvirtMCPServer._format_result(None)
         assert "成功" in result
 
     def test_format_result_string(self, mock_conn_class, mock_config):
-        from src.server import OvirtMCPServer
+        from ovirt_engine_mcp_server.server import OvirtMCPServer
 
         result = OvirtMCPServer._format_result("hello")
         assert result == "hello"
 
     def test_format_result_dict_success(self, mock_conn_class, mock_config):
-        from src.server import OvirtMCPServer
+        from ovirt_engine_mcp_server.server import OvirtMCPServer
 
         result = OvirtMCPServer._format_result({"success": True, "message": "done"})
         assert "done" in result
 
     def test_format_result_dict_error(self, mock_conn_class, mock_config):
-        from src.server import OvirtMCPServer
+        from ovirt_engine_mcp_server.server import OvirtMCPServer
 
         result = OvirtMCPServer._format_result({"error": "not found"})
         assert "not found" in result
